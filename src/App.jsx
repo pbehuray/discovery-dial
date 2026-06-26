@@ -1,149 +1,76 @@
-import React, { useState, useMemo, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { TRACKS, VIBES } from "./tracks.js";
 
-// Build the result set: total tracks varies with dial; the dial sets the % that are "new".
-function buildMix(vibeId, adventurousness) {
-  const pool = TRACKS.filter((t) => t.vibe === vibeId);
-  const familiar = pool.filter((t) => t.familiarity === "familiar");
-  const fresh = pool.filter((t) => t.familiarity === "new");
-  const TOTAL = adventurousness >= 40 ? 10 : 8;
-  const newCount = Math.round((adventurousness / 100) * TOTAL);
-  const famCount = TOTAL - newCount;
-
-  const pick = (arr, n) => {
-    const shuffled = [...arr].sort(() => Math.random() - 0.5);
-    return shuffled.slice(0, Math.min(n, arr.length));
-  };
-  const chosenNew = pick(fresh, newCount);
-  const chosenFam = pick(familiar, famCount);
-  // interleave so new tracks are sprinkled through, not dumped at the end
-  const out = [];
-  const maxLen = Math.max(chosenFam.length, chosenNew.length);
-  for (let i = 0; i < maxLen; i++) {
-    if (chosenFam[i]) out.push({ ...chosenFam[i], isNew: false });
-    if (chosenNew[i]) out.push({ ...chosenNew[i], isNew: true });
-  }
-  return out;
-}
-
-function dialLabel(v) {
-  if (v <= 10) return "Comfort";
-  if (v <= 25) return "Mostly familiar";
-  if (v <= 40) return "Adventurous";
-  return "Maximum discovery";
-}
-
-// Generate a deterministic gradient for each track's "album art" tile
-function artGradient(seed) {
-  const palettes = [
-    ["#7c3aed", "#3b0764"], ["#0ea5e9", "#0c4a6e"], ["#10b981", "#064e3b"],
-    ["#f59e0b", "#78350f"], ["#ec4899", "#831843"], ["#ef4444", "#7f1d1d"],
-    ["#8b5cf6", "#4c1d95"], ["#06b6d4", "#155e75"], ["#84cc16", "#365314"],
-    ["#f97316", "#7c2d12"], ["#a855f7", "#581c87"], ["#14b8a6", "#134e4a"],
-  ];
-  let h = 0;
-  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
-  return palettes[h % palettes.length];
-}
-
-function initials(name) {
-  return name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
-}
-
-function WhyAI() {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="whyai">
-      <button className="whyai-toggle" onClick={() => setOpen((o) => !o)}>
-        <span className="whyai-icon">
-          <svg viewBox="0 0 24 24" width="13" height="13" fill="#1ed760">
-            <path d="M12 2l2.39 7.36H22l-6.19 4.5L18.2 21 12 16.5 5.8 21l2.39-7.14L2 9.36h7.61L12 2z"/>
-          </svg>
-        </span>
-        Why AI? — not just another recommendation algorithm
-        <span className="whyai-chevron" style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)" }}>
-          <svg viewBox="0 0 24 24" width="13" height="13" fill="#b3b3b3"><path d="M6 9l6 6 6-6"/></svg>
-        </span>
-      </button>
-
-      {open && (
-        <div className="whyai-body">
-          <div className="whyai-grid">
-            <div className="whyai-col whyai-col-old">
-              <div className="whyai-col-head">Traditional recommendation</div>
-              <ul>
-                <li>Collaborative filtering: surfaces what <em>similar users</em> played next</li>
-                <li>Predicts your next track from listening history patterns</li>
-                <li>Optimises for immediate engagement — keeps you in your bubble</li>
-                <li><strong>Cannot explain why a track belongs — it's a black box</strong></li>
-                <li>Has no mechanism for the listener to steer <em>how much</em> new enters</li>
-              </ul>
-            </div>
-            <div className="whyai-col whyai-col-new">
-              <div className="whyai-col-head">Discovery Dial + AI</div>
-              <ul>
-                <li>Listener sets the discovery level — the dial is explicit control</li>
-                <li>LLM reasons over each new track's mood, energy, era, and scene</li>
-                <li>Generates a per-track sentence: <em>why this track, in this vibe, right now</em></li>
-                <li><strong>Turns "algorithm black box" into "discovery you can trust"</strong></li>
-                <li>Explainability was previously impossible at scale without AI</li>
-              </ul>
-            </div>
-          </div>
-          <div className="whyai-note">
-            Prototype scope: vibe + dial as personalization signal. Production: plug into Spotify's
-            existing taste graph (top artists, recent listens, skip patterns) as the AI's input.
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// Sidebar playlist items (matches the real Spotify library look)
-const LIBRARY = [
-  { name: "Liked Songs", meta: "Playlist · 122 songs", pinned: true, palette: ["#7c3aed", "#c4b5fd"], glyph: "♥" },
-  { name: "Discovery Mix", meta: "Playlist · Made for you", active: true, palette: ["#1db954", "#064e3b"], glyph: "◍" },
-  { name: "GYM SONGS 🎀 (for girlies) 2026", meta: "Playlist · The music enthusiast", palette: ["#f43f5e", "#7f1d1d"] },
-  { name: "Haunted — Beyoncé", meta: "Playlist · Oona Katariina Kastari", palette: ["#1f2937", "#0f172a"] },
-  { name: "Flirting songs", meta: "Playlist · Bunny 🐰", palette: ["#ec4899", "#7c2d12"] },
-  { name: "Tale of karma", meta: "Playlist · Dj Ashwin shetty", palette: ["#374151", "#111827"] },
-  { name: "Wedding 2024", meta: "Playlist · amritansu", palette: ["#b91c1c", "#7f1d1d"] },
-  { name: "Indie Essentials", meta: "Playlist · Spotify", palette: ["#0ea5e9", "#0c4a6e"] },
-  { name: "Daily Mix 1", meta: "Playlist · Made for you", palette: ["#f59e0b", "#78350f"] },
+const PLAYLISTS = [
+  { id:"p1", name:"GYM SONGS 💪 (for girlies) 2026", sub:"Playlist · The music enthusiast", color:"#c8102e", emoji:"💪" },
+  { id:"p2", name:"Liked Songs", sub:"Playlist · 122 songs", color:"#4B0082", emoji:"♥" },
+  { id:"p3", name:"Haunted — Beyoncé", sub:"Playlist · Oona Katariina Kastari", color:"#8B0000", emoji:"👻" },
+  { id:"p4", name:"Flirting songs", sub:"Playlist · Bunny 🐰", color:"#ff69b4", emoji:"💕" },
+  { id:"p5", name:"Tale of karma", sub:"Playlist · Dj Ashwin shetty", color:"#ff6600", emoji:"🎵" },
+  { id:"p6", name:"Wedding 2024", sub:"Playlist · amritansu", color:"#8B6914", emoji:"💒" },
+  { id:"p7", name:"Discovery Mix ✦", sub:"Playlist · Made for purbasha", color:"#1DB954", emoji:"◎", isDiscovery:true },
 ];
 
+const VIBE_LABELS = {
+  indie:"Indie", ambient:"Ambient", techno:"Late-night", hyperpop:"Hyperpop", jazz:"Jazz", shoegaze:"Shoegaze"
+};
+
+function buildMix(activeVibes, dialPct) {
+  const vibeSet = activeVibes.length ? activeVibes : ["indie"];
+  const pool = TRACKS.filter(t => vibeSet.includes(t.vibe));
+  const familiar = pool.filter(t => t.familiarity === "familiar");
+  const newTracks = pool.filter(t => t.familiarity === "new");
+  const total = dialPct >= 40 ? 10 : 8;
+  const newCount = Math.round(total * (dialPct / 100));
+  const famCount = total - newCount;
+  const shuffle = arr => [...arr].sort(() => Math.random() - 0.5);
+  const picked = [
+    ...shuffle(familiar).slice(0, famCount),
+    ...shuffle(newTracks).slice(0, newCount),
+  ];
+  return shuffle(picked);
+}
+
 export default function App() {
-  const [vibeId, setVibeId] = useState("indie");
-  const [adv, setAdv] = useState(25);
+  const [activeVibes, setActiveVibes] = useState(["indie"]);
+  const [dial, setDial] = useState(25);
   const [mix, setMix] = useState([]);
   const [reasons, setReasons] = useState({});
-  const [loading, setLoading] = useState(false);
   const [aiSource, setAiSource] = useState(null);
-  const [libraryFilter, setLibraryFilter] = useState("Playlists");
-  const vibe = useMemo(() => VIBES.find((v) => v.id === vibeId), [vibeId]);
+  const [loading, setLoading] = useState(false);
+  const [playing, setPlaying] = useState(null);
+  const [activePlaylist, setActivePlaylist] = useState("p7");
+  const sliderRef = useRef(null);
 
-  async function generate() {
-    const next = buildMix(vibeId, adv);
-    setMix(next);
+  const dialLabel = dial <= 15 ? "Comfort zone" : dial <= 35 ? "Mostly familiar" : dial <= 60 ? "Adventurous" : "Maximum discovery";
+  const newCount = mix.filter(t => t.familiarity === "new").length;
+  const currentTrack = playing || mix[0] || { title:"Discovery Mix", artist:"purbasha" };
+
+  const vibeLabel = activeVibes.map(id => VIBES.find(v => v.id === id)?.label).filter(Boolean).join(" + ");
+  const vibeSeed  = activeVibes.map(id => VIBES.find(v => v.id === id)?.seed).filter(Boolean).join(", ");
+
+  async function rebuild() {
+    const newMix = buildMix(activeVibes, dial);
+    setMix(newMix);
     setReasons({});
     setAiSource(null);
-    const newOnes = next.filter((t) => t.isNew);
-    if (newOnes.length === 0) return;
+    if (newMix.length) setPlaying(newMix[0]);
+    const newOnes = newMix.filter(t => t.familiarity === "new");
+    if (!newOnes.length) return;
     setLoading(true);
     try {
       const r = await fetch("/api/reason", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
         body: JSON.stringify({
-          vibeLabel: vibe.label,
-          vibeSeed: vibe.seed,
-          tracks: newOnes.map((t) => ({ id: t.id, title: t.title, artist: t.artist, mood: t.mood, energy: t.energy, year: t.year })),
+          vibeLabel,
+          vibeSeed,
+          tracks: newOnes.map(t => ({ id:t.id, title:t.title, artist:t.artist, mood:t.mood, energy:t.energy, year:t.year })),
         }),
       });
       const data = await r.json();
       const map = {};
-      (data.reasons || []).forEach((x) => { map[x.id] = x.why; });
+      (data.reasons || []).forEach(x => { map[x.id] = x.why; });
       setReasons(map);
       setAiSource(data.source);
     } catch {
@@ -153,394 +80,355 @@ export default function App() {
     }
   }
 
-  useEffect(() => { generate(); /* eslint-disable-next-line */ }, []);
+  useEffect(() => { rebuild(); }, []);
 
-  const newCount = mix.filter((t) => t.isNew).length;
-  const nowPlaying = mix[0];
-  const nowPlayingPalette = nowPlaying ? artGradient(nowPlaying.artist) : ["#7c3aed", "#3b0764"];
+  function toggleVibe(v) {
+    setActiveVibes(prev =>
+      prev.includes(v)
+        ? prev.length > 1 ? prev.filter(x => x !== v) : prev
+        : [...prev, v]
+    );
+  }
+
+  function handleSliderClick(e) {
+    if (!sliderRef.current) return;
+    const rect = sliderRef.current.getBoundingClientRect();
+    const pct = Math.max(0, Math.min(100, Math.round(((e.clientX - rect.left) / rect.width) * 100)));
+    setDial(pct);
+  }
 
   return (
-    <div className="sp-app">
+    <div style={{ display:"flex", flexDirection:"column", height:"100vh", background:"#000", color:"#fff", fontFamily:"'Circular Std','Helvetica Neue',Arial,sans-serif", overflow:"hidden" }}>
+
       {/* TOP BAR */}
-      <div className="topbar">
-        <div className="topbar-left">
-          <div className="sp-logo" aria-label="Spotify">
-            <svg viewBox="0 0 168 168" width="32" height="32"><path fill="#1ED760" d="M83.996.277C37.747.277.253 37.77.253 84.019c0 46.251 37.494 83.741 83.743 83.741 46.254 0 83.744-37.49 83.744-83.741 0-46.246-37.49-83.738-83.745-83.738l.001-.004zm38.404 120.78a5.217 5.217 0 01-7.18 1.73c-19.662-12.01-44.414-14.73-73.564-8.07a5.222 5.222 0 01-6.249-3.93 5.213 5.213 0 013.926-6.25c31.9-7.291 59.263-4.15 81.337 9.34 2.46 1.51 3.24 4.72 1.73 7.18zm10.25-22.805c-1.89 3.075-5.91 4.045-8.98 2.155-22.51-13.83-56.823-17.84-83.448-9.764-3.453 1.043-7.1-.903-8.148-4.35a6.538 6.538 0 014.354-8.143c30.413-9.228 68.222-4.758 94.072 11.127 3.07 1.89 4.04 5.91 2.15 8.976v-.001zm.88-23.744c-26.99-16.031-71.52-17.505-97.289-9.684-4.138 1.255-8.514-1.081-9.768-5.219a7.835 7.835 0 015.221-9.771c29.581-8.98 78.756-7.245 109.83 11.202a7.823 7.823 0 012.74 10.733c-2.2 3.722-7.02 4.949-10.73 2.739z"/></svg>
-          </div>
+      <div style={{ height:64, background:"#000", display:"flex", alignItems:"center", padding:"0 16px", gap:8, flexShrink:0, zIndex:10 }}>
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="#1DB954">
+          <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
+        </svg>
+        <button style={{ background:"rgba(0,0,0,0.7)", border:"none", color:"#fff", width:32, height:32, borderRadius:"50%", cursor:"pointer", fontSize:18 }}>‹</button>
+        <button style={{ background:"rgba(0,0,0,0.7)", border:"none", color:"#b3b3b3", width:32, height:32, borderRadius:"50%", cursor:"pointer", fontSize:18 }}>›</button>
+        <div style={{ flex:1, maxWidth:380, position:"relative", margin:"0 auto" }}>
+          <span style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", fontSize:14 }}>🔍</span>
+          <input placeholder="What do you want to play?" style={{ width:"100%", padding:"10px 16px 10px 36px", borderRadius:500, background:"#fff", border:"none", fontSize:14, color:"#000", boxSizing:"border-box", outline:"none" }}/>
+          <span style={{ position:"absolute", right:12, top:"50%", transform:"translateY(-50%)", color:"#000", fontSize:16 }}>⊞</span>
         </div>
-
-        <div className="topbar-center">
-          <button className="tb-icon-btn" aria-label="Home" title="Home">
-            <svg viewBox="0 0 24 24" width="24" height="24" fill="white"><path d="M12.5 3.247a1 1 0 00-1 0L4 7.577V20h4.5v-6a1 1 0 011-1h5a1 1 0 011 1v6H20V7.577l-7.5-4.33zm-2-1.732a3 3 0 013 0L21 6.181a1 1 0 01.5.866V21a1 1 0 01-1 1h-6.5a1 1 0 01-1-1v-6h-3v6a1 1 0 01-1 1H3.5a1 1 0 01-1-1V7.047a1 1 0 01.5-.866l7.5-4.666z"/></svg>
-          </button>
-          <div className="tb-search">
-            <svg viewBox="0 0 24 24" width="22" height="22" fill="#b3b3b3"><path d="M10.533 1.279c-5.18 0-9.407 4.14-9.407 9.279s4.226 9.279 9.407 9.279c2.234 0 4.29-.77 5.907-2.058l4.353 4.353a1 1 0 101.414-1.414l-4.344-4.344a9.157 9.157 0 002.077-5.816c0-5.14-4.226-9.28-9.407-9.28zm-7.407 9.279c0-4.006 3.302-7.28 7.407-7.28s7.407 3.274 7.407 7.28-3.302 7.279-7.407 7.279-7.407-3.273-7.407-7.28z"/></svg>
-            <input placeholder="What do you want to play?" />
-            <span className="tb-search-divider" />
-            <button className="tb-browse" aria-label="Browse">
-              <svg viewBox="0 0 24 24" width="22" height="22" fill="#b3b3b3"><path d="M15 15.5h-2v-7h2v7zm-4 0H9v-3h2v3zM3 3h18v18H3V3zm2 2v14h14V5H5z"/></svg>
-            </button>
-          </div>
-        </div>
-
-        <div className="topbar-right">
-          <button className="tb-pill-light">Explore Premium</button>
-          <button className="tb-pill-ghost">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="white"><path d="M12 16l-5-5h3V4h4v7h3l-5 5zM4 18h16v2H4z"/></svg>
-            Install App
-          </button>
-          <button className="tb-circle" aria-label="Notifications">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="white"><path d="M11.998 1.04a8.96 8.96 0 00-8.96 8.96v3.764L1.232 16.5c-.413.673.071 1.54.859 1.54h5.012a4.898 4.898 0 009.79 0h5.012c.788 0 1.272-.867.859-1.54l-1.806-2.736V10A8.96 8.96 0 0011.998 1.04zm0 19a2.898 2.898 0 01-2.83-2.5h5.66a2.898 2.898 0 01-2.83 2.5z"/></svg>
-          </button>
-          <button className="tb-circle" aria-label="Friend activity">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="white"><path d="M9 11a4 4 0 100-8 4 4 0 000 8zm0 2c-3.31 0-6 1.79-6 4v3h12v-3c0-2.21-2.69-4-6-4zm9-2c1.66 0 3-1.79 3-4s-1.34-4-3-4-3 1.79-3 4 1.34 4 3 4zm0 2c-.7 0-1.36.08-1.97.23.61.99.97 2.12.97 3.27v3h6v-3c0-2.21-2.69-4-5-4z"/></svg>
-          </button>
-          <button className="tb-avatar" aria-label="Profile">P</button>
+        <div style={{ display:"flex", alignItems:"center", gap:8, marginLeft:"auto" }}>
+          <button style={{ background:"#fff", color:"#000", border:"none", borderRadius:500, padding:"8px 16px", fontWeight:700, fontSize:13, cursor:"pointer" }}>Explore Premium</button>
+          <button style={{ background:"transparent", color:"#fff", border:"1px solid #fff", borderRadius:500, padding:"8px 14px", fontWeight:700, fontSize:13, cursor:"pointer" }}>↓ Install App</button>
+          <div style={{ width:32, height:32, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", fontSize:18 }}>🔔</div>
+          <div style={{ width:32, height:32, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", fontSize:18 }}>👥</div>
+          <div style={{ width:32, height:32, borderRadius:"50%", background:"#532683", display:"flex", alignItems:"center", justifyContent:"center", fontSize:13, fontWeight:700, cursor:"pointer" }}>P</div>
         </div>
       </div>
 
-      {/* MAIN GRID: sidebar + content + right panel */}
-      <div className="grid">
-        {/* LEFT SIDEBAR */}
-        <aside className="sidebar">
-          <div className="lib-head">
-            <div className="lib-title">
-              <svg viewBox="0 0 24 24" width="22" height="22" fill="#b3b3b3"><path d="M3 22a1 1 0 01-1-1V3a1 1 0 012 0v18a1 1 0 01-1 1zm6.5 0a1 1 0 01-1-1V3a1 1 0 012 0v18a1 1 0 01-1 1zM20 22H14a1 1 0 01-1-1V3a1 1 0 011-1h6a1 1 0 011 1v18a1 1 0 01-1 1z"/></svg>
-              Your Library
-            </div>
-            <div className="lib-tools">
-              <button className="lib-tool" title="Create">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="#b3b3b3"><path d="M12 4a1 1 0 011 1v6h6a1 1 0 110 2h-6v6a1 1 0 11-2 0v-6H5a1 1 0 110-2h6V5a1 1 0 011-1z"/></svg>
-                Create
-              </button>
-              <button className="lib-tool-icon" title="Expand">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="#b3b3b3"><path d="M7.404 4.343a.75.75 0 010 1.06L3.811 9h12.378l-3.593-3.596a.75.75 0 011.061-1.06L19.06 9.586a1 1 0 010 1.414l-5.404 5.243a.75.75 0 11-1.06-1.061L16.19 11.5H3.81l3.594 3.682a.75.75 0 11-1.06 1.06L.94 11a1 1 0 010-1.414l5.404-5.243a.75.75 0 011.06 0z"/></svg>
-              </button>
+      {/* MAIN 3-COLUMN */}
+      <div style={{ flex:1, display:"flex", overflow:"hidden", gap:8, padding:"0 8px 8px" }}>
+
+        {/* LEFT — Your Library */}
+        <div style={{ width:280, background:"#121212", borderRadius:8, display:"flex", flexDirection:"column", overflow:"hidden", flexShrink:0 }}>
+          <div style={{ padding:"16px 16px 8px", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+            <div style={{ fontWeight:700, fontSize:15 }}>☰ Your Library</div>
+            <div style={{ display:"flex", gap:6 }}>
+              <button style={{ background:"transparent", border:"none", color:"#b3b3b3", fontSize:22, cursor:"pointer" }}>+</button>
+              <span style={{ color:"#b3b3b3", fontSize:13, cursor:"pointer", alignSelf:"center" }}>Create</span>
+              <button style={{ background:"transparent", border:"none", color:"#b3b3b3", fontSize:16, cursor:"pointer" }}>⤢</button>
             </div>
           </div>
-
-          <div className="lib-filters">
-            {["Playlists", "Artists", "Albums"].map((f) => (
-              <button key={f}
-                      className={"lib-chip" + (libraryFilter === f ? " on" : "")}
-                      onClick={() => setLibraryFilter(f)}>{f}</button>
+          <div style={{ padding:"0 16px 8px", display:"flex", gap:6 }}>
+            {["Playlists","Artists","Albums"].map(f => (
+              <button key={f} style={{ background:f==="Playlists"?"#fff":"#2a2a2a", color:f==="Playlists"?"#000":"#fff", border:"none", borderRadius:500, padding:"6px 12px", fontSize:12, fontWeight:600, cursor:"pointer" }}>{f}</button>
             ))}
           </div>
-
-          <div className="lib-search-row">
-            <button className="lib-search-icon" title="Search in library">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="#b3b3b3"><path d="M10.533 1.279c-5.18 0-9.407 4.14-9.407 9.279s4.226 9.279 9.407 9.279c2.234 0 4.29-.77 5.907-2.058l4.353 4.353a1 1 0 101.414-1.414l-4.344-4.344a9.157 9.157 0 002.077-5.816c0-5.14-4.226-9.28-9.407-9.28zm-7.407 9.279c0-4.006 3.302-7.28 7.407-7.28s7.407 3.274 7.407 7.28-3.302 7.279-7.407 7.279-7.407-3.273-7.407-7.28z"/></svg>
-            </button>
-            <span className="lib-recents">Recents
-              <svg viewBox="0 0 16 16" width="14" height="14" fill="#b3b3b3"><path d="M15 14.5H1V13h14v1.5zM15 9H1V7.5h14V9zm0-5.5H1V2h14v1.5z"/></svg>
-            </span>
+          <div style={{ padding:"0 16px 8px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+            <button style={{ background:"transparent", border:"none", color:"#b3b3b3", fontSize:16, cursor:"pointer" }}>🔍</button>
+            <span style={{ color:"#b3b3b3", fontSize:12, cursor:"pointer" }}>Recents ☰</span>
           </div>
-
-          <ul className="lib-list">
-            {LIBRARY.map((item, i) => (
-              <li key={i} className={"lib-item" + (item.active ? " on" : "")}>
-                <div className="lib-art"
-                     style={{
-                       background: `linear-gradient(135deg, ${item.palette[0]}, ${item.palette[1]})`,
-                     }}>
-                  {item.glyph && <span className="lib-art-glyph">{item.glyph}</span>}
+          <div style={{ flex:1, overflowY:"auto", padding:"0 8px" }}>
+            {PLAYLISTS.map(pl => (
+              <div key={pl.id} onClick={() => setActivePlaylist(pl.id)}
+                style={{ display:"flex", alignItems:"center", gap:12, padding:"8px", borderRadius:4, cursor:"pointer", background:activePlaylist===pl.id?"#2a2a2a":"transparent" }}>
+                <div style={{ width:48, height:48, borderRadius:4, background:pl.isDiscovery?"#1DB954":pl.color||"#333", display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, flexShrink:0 }}>
+                  {pl.isDiscovery ? "◎" : pl.emoji}
                 </div>
-                <div className="lib-meta">
-                  <div className="lib-name">
-                    {item.pinned && <span className="lib-pin">📌</span>}
-                    {item.name}
+                <div style={{ minWidth:0 }}>
+                  <div style={{ fontSize:14, fontWeight:500, color:pl.isDiscovery?"#1DB954":"#fff", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{pl.name}</div>
+                  <div style={{ fontSize:12, color:"#b3b3b3", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{pl.sub}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* CENTER */}
+        <div style={{ flex:1, background:"#121212", borderRadius:8, overflowY:"auto" }}>
+          {/* Home hero gradient */}
+          <div style={{ background:"linear-gradient(180deg,#1a3a2e 0%,#121212 100%)", padding:"24px 24px 0" }}>
+            {/* Quick access grid */}
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:8, marginBottom:24 }}>
+              {[
+                { name:"GYM SONGS 💪 (for girlies) 2026", color:"#c8102e", emoji:"💪" },
+                { name:"Liked Songs", color:"#4B0082", emoji:"♥" },
+                { name:"The Summer I Turned Pretty: Official Playlist", color:"#8B4513", emoji:"🌸" },
+                { name:"Shree Hanuman Chalisa (Hanuman Ashtak)", color:"#ff6600", emoji:"🙏" },
+                { name:"Slow Coffee, Slow Heart", color:"#006400", emoji:"☕" },
+                { name:"Ep. 17: Ritika Saraf", color:"#4169E1", emoji:"🎙️" },
+              ].map((item,i) => (
+                <div key={i} style={{ background:"rgba(255,255,255,0.1)", borderRadius:4, display:"flex", alignItems:"center", gap:8, padding:"4px 12px 4px 4px", cursor:"pointer" }}>
+                  <div style={{ width:48, height:48, background:item.color, borderRadius:4, flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20 }}>{item.emoji}</div>
+                  <span style={{ fontSize:13, fontWeight:700, lineHeight:1.2 }}>{item.name}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Getting started + Made for purbasha */}
+            <div style={{ display:"flex", gap:24, marginBottom:16 }}>
+              <div style={{ flex:1 }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
+                  <h2 style={{ margin:0, fontSize:22, fontWeight:700 }}>Getting started</h2>
+                  <div style={{ display:"flex", gap:8 }}>
+                    <button style={{ background:"rgba(0,0,0,0.5)", border:"none", color:"#fff", width:28, height:28, borderRadius:"50%", cursor:"pointer" }}>‹</button>
+                    <button style={{ background:"rgba(0,0,0,0.5)", border:"none", color:"#fff", width:28, height:28, borderRadius:"50%", cursor:"pointer" }}>›</button>
                   </div>
-                  <div className="lib-sub">{item.meta}</div>
                 </div>
-              </li>
-            ))}
-          </ul>
-        </aside>
-
-        {/* MAIN CONTENT (playlist page) */}
-        <main className="content">
-          <div className="content-scroll">
-            {/* PLAYLIST HERO */}
-            <div className="hero">
-              <div className="hero-bg" />
-              <div className="hero-inner">
-                <div className="hero-art">
-                  <svg viewBox="0 0 64 64" width="120" height="120">
-                    <defs>
-                      <linearGradient id="dialArt" x1="0" y1="0" x2="1" y2="1">
-                        <stop offset="0" stopColor="#1ed760"/>
-                        <stop offset="1" stopColor="#0a6b32"/>
-                      </linearGradient>
-                    </defs>
-                    <circle cx="32" cy="32" r="22" fill="none" stroke="url(#dialArt)" strokeWidth="3"/>
-                    <line x1="32" y1="14" x2="32" y2="50" stroke="#0a6b32" strokeWidth="2"/>
-                    <line x1="24" y1="16" x2="24" y2="48" stroke="#0a6b32" strokeWidth="2"/>
-                    <line x1="40" y1="16" x2="40" y2="48" stroke="#0a6b32" strokeWidth="2"/>
-                    <circle cx="32" cy="32" r="4" fill="#1ed760"/>
-                  </svg>
-                </div>
-                <div className="hero-text">
-                  <div className="hero-type">Playlist</div>
-                  <h1 className="hero-title">Discovery Mix</h1>
-                  <div className="hero-desc">Tuned to your dial — fresh music, on your terms. Every new track explained.</div>
-                  <div className="hero-meta">
-                    <span className="hero-creator">
-                      <span className="hero-creator-dot" />
-                      Made for <strong>purbasha</strong>
-                    </span>
-                    <span className="dot">·</span>
-                    <span>{mix.length} songs</span>
-                    <span className="dot">·</span>
-                    <span><strong className="hero-new">{newCount} new</strong> mixed in</span>
+                <div style={{ background:"linear-gradient(135deg,#c8a84b 0%,#8B6914 100%)", borderRadius:8, padding:16 }}>
+                  <div style={{ fontSize:20, fontWeight:900, marginBottom:4 }}>1. Start playing</div>
+                  <div style={{ fontSize:13, opacity:0.9, marginBottom:12 }}>Search, browse, and play your favorite artists and creators.</div>
+                  <div style={{ display:"flex", gap:8 }}>
+                    <button style={{ background:"#1DB954", color:"#000", border:"none", borderRadius:500, padding:"8px 20px", fontWeight:700, fontSize:14, cursor:"pointer" }}>Search</button>
+                    <button style={{ background:"transparent", color:"#c8a84b", border:"none", fontWeight:600, fontSize:13, cursor:"pointer" }}>Show more tips</button>
                   </div>
                 </div>
               </div>
-            </div>
-
-            {/* ACTION BAR */}
-            <div className="action-bar">
-              <button className="play-fab" aria-label="Play">
-                <svg viewBox="0 0 24 24" width="24" height="24" fill="#000"><path d="M7.05 3.606l13.49 7.788a.7.7 0 010 1.212L7.05 20.394A.7.7 0 016 19.788V4.212a.7.7 0 011.05-.606z"/></svg>
-              </button>
-              <button className="ab-icon" aria-label="Add">
-                <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="#b3b3b3" strokeWidth="1.5"><circle cx="12" cy="12" r="10"/><path d="M8 12h8M12 8v8" stroke="#b3b3b3" strokeWidth="1.5" strokeLinecap="round"/></svg>
-              </button>
-              <button className="ab-icon" aria-label="More">
-                <svg viewBox="0 0 24 24" width="24" height="24" fill="#b3b3b3"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
-              </button>
-              <div className="ab-spacer" />
-              <button className="ab-view">
-                List
-                <svg viewBox="0 0 16 16" width="14" height="14" fill="#b3b3b3"><path d="M15 14.5H1V13h14v1.5zM15 9H1V7.5h14V9zm0-5.5H1V2h14v1.5z"/></svg>
-              </button>
-            </div>
-
-            {/* DIAL CARD */}
-            <section className="dial-card">
-              <div className="dial-card-left">
-                <div className="dial-card-head">
-                  <span className="dial-card-eyebrow">Discovery Dial</span>
-                  <span className="dial-card-state">{dialLabel(adv)} · <strong>{adv}% new</strong></span>
+              <div style={{ flex:1 }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
+                  <div>
+                    <div style={{ fontSize:12, color:"#b3b3b3", marginBottom:2 }}>Made For</div>
+                    <h2 style={{ margin:0, fontSize:22, fontWeight:700 }}>purbasha</h2>
+                  </div>
+                  <span style={{ color:"#1DB954", fontSize:13, fontWeight:600, cursor:"pointer" }}>Show all</span>
                 </div>
-                <input
-                  type="range" min="0" max="50" step="5" value={adv}
-                  onChange={(e) => setAdv(Number(e.target.value))}
-                  className="dial-slider"
-                  style={{ "--fill": `${(adv / 50) * 100}%` }}
-                />
-                <div className="dial-ends">
-                  <span>Comfort</span><span>Maximum discovery</span>
-                </div>
-              </div>
-              <div className="dial-card-right">
-                <div className="vibes">
-                  {VIBES.slice(0, 6).map((v) => (
-                    <button
-                      key={v.id}
-                      className={"vibe-chip" + (v.id === vibeId ? " on" : "")}
-                      onClick={() => setVibeId(v.id)}
-                    >
-                      {v.label.split(" ")[0]}
-                    </button>
+                <div style={{ display:"flex", gap:12 }}>
+                  {[{n:"Daily Mix 01",a:"Arijit Singh, Himesh...",c:"#ff6600"},{n:"Daily Mix 02",a:"Olivia Rodrigo, Katy...",c:"#9B59B6"}].map((m,i) => (
+                    <div key={i} style={{ flex:1, background:"#2a2a2a", borderRadius:8, padding:12, cursor:"pointer" }}>
+                      <div style={{ width:"100%", paddingBottom:"100%", background:`linear-gradient(135deg,${m.c},#000)`, borderRadius:4, position:"relative", marginBottom:8, overflow:"hidden" }}>
+                        <div style={{ position:"absolute", top:8, left:8, background:m.c, borderRadius:4, padding:"2px 6px", fontSize:10, fontWeight:700 }}>Daily Mix</div>
+                        <div style={{ position:"absolute", top:8, right:8, background:"rgba(0,0,0,0.8)", borderRadius:4, padding:"2px 6px", fontSize:11, fontWeight:900 }}>0{i+1}</div>
+                      </div>
+                      <div style={{ fontSize:13, fontWeight:600 }}>{m.n}</div>
+                      <div style={{ fontSize:12, color:"#b3b3b3" }}>{m.a}</div>
+                    </div>
                   ))}
                 </div>
-                <button className="build-btn" onClick={generate} disabled={loading}>
-                  {loading ? "Tuning…" : "▸ Build mix"}
-                </button>
               </div>
-            </section>
-
-            {/* WHY AI EXPLAINER */}
-            <WhyAI />
-
-            {/* AI BANNER */}
-            <div className="ai-banner">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="#1ed760"><path d="M12 2l2.39 7.36H22l-6.19 4.5L18.2 21 12 16.5 5.8 21l2.39-7.14L2 9.36h7.61L12 2z"/></svg>
-              {aiSource === "groq" ? "AI relevance live — each new pick explained" : "AI relevance active — each new pick explained"}
             </div>
+          </div>
 
-            {/* TRACK TABLE */}
-            <div className="tracks">
-              <div className="tracks-head">
-                <div className="th th-num">#</div>
-                <div className="th th-title">Title</div>
-                <div className="th th-album">Album</div>
-                <div className="th th-tag">Tag</div>
-                <div className="th th-year" title="Year">
-                  <svg viewBox="0 0 16 16" width="14" height="14" fill="#b3b3b3"><path d="M8 0a8 8 0 100 16A8 8 0 008 0zm0 14.5A6.5 6.5 0 118 1.5a6.5 6.5 0 010 13zM8 3a.75.75 0 01.75.75v4.19l2.53 1.46a.75.75 0 11-.75 1.3l-2.91-1.68a.75.75 0 01-.37-.65V3.75A.75.75 0 018 3z"/></svg>
+          {/* DISCOVERY MIX — scrolls into view below home */}
+          <div style={{ padding:"0 24px 24px" }}>
+            <div style={{ marginBottom:12, color:"#b3b3b3", fontSize:13, fontWeight:600, letterSpacing:1 }}>ALBUMS FEATURING SONGS YOU LIKE</div>
+
+            <div style={{ background:"#181818", borderRadius:8, overflow:"hidden" }}>
+              {/* Playlist header */}
+              <div style={{ background:"linear-gradient(135deg,#1a5c2e 0%,#0d3018 100%)", padding:"20px 20px 0" }}>
+                <div style={{ display:"flex", gap:16, alignItems:"flex-end", marginBottom:20 }}>
+                  <div style={{ width:140, height:140, background:"#1DB954", borderRadius:4, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                    <span style={{ fontSize:56 }}>◎</span>
+                  </div>
+                  <div>
+                    <div style={{ fontSize:11, fontWeight:600, letterSpacing:1, color:"rgba(255,255,255,0.7)", marginBottom:4 }}>PLAYLIST</div>
+                    <h1 style={{ margin:"0 0 8px", fontSize:36, fontWeight:900, letterSpacing:-1 }}>Discovery Mix</h1>
+                    <div style={{ fontSize:14, color:"rgba(255,255,255,0.7)", marginBottom:4 }}>Tuned to your dial — fresh music, on your terms.</div>
+                    <div style={{ fontSize:13, color:"rgba(255,255,255,0.6)" }}>
+                      Made for you · {mix.length} songs · <span style={{ color:"#1DB954", fontWeight:600 }}>{newCount} new</span> mixed in
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div className="tracks-divider" />
-              {mix.map((t, i) => {
-                const [c1, c2] = artGradient(t.artist);
-                const isPlaying = i === 0;
-                return (
-                  <div key={t.id + i} className={"trow" + (isPlaying ? " playing" : "")}>
-                    <div className="tc tc-num">
-                      {isPlaying
-                        ? (<span className="eq"><i/><i/><i/></span>)
-                        : (i + 1)}
-                    </div>
-                    <div className="tc tc-title">
-                      <div className="tc-art" style={{ background: `linear-gradient(135deg, ${c1}, ${c2})` }}>
-                        {initials(t.artist)}
+
+              {/* Play + heart */}
+              <div style={{ padding:"16px 20px", display:"flex", alignItems:"center", gap:16 }}>
+                <button onClick={rebuild} style={{ width:56, height:56, borderRadius:"50%", background:"#1DB954", border:"none", color:"#000", fontSize:22, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer" }}>▶</button>
+                <div style={{ color:"#b3b3b3", fontSize:22, cursor:"pointer" }}>♡</div>
+                <div style={{ color:"#b3b3b3", fontSize:18, cursor:"pointer" }}>⋯</div>
+              </div>
+
+              {/* DIAL */}
+              <div style={{ margin:"0 20px 16px", background:"#282828", borderRadius:8, padding:"16px 20px" }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
+                  <span style={{ color:"#1DB954", fontSize:12, fontWeight:700, letterSpacing:1 }}>✦ DISCOVERY DIAL</span>
+                  <span style={{ color:"#b3b3b3", fontSize:13 }}>{dialLabel} · <strong style={{ color:"#fff" }}>{dial}% new</strong></span>
+                </div>
+                <div ref={sliderRef} onClick={handleSliderClick}
+                  style={{ position:"relative", height:4, background:"#535353", borderRadius:2, cursor:"pointer", marginBottom:8 }}>
+                  <div style={{ position:"absolute", left:0, top:0, height:"100%", width:`${dial}%`, background:"#1DB954", borderRadius:2 }}/>
+                  <div style={{ position:"absolute", top:"50%", left:`${dial}%`, transform:"translate(-50%,-50%)", width:16, height:16, borderRadius:"50%", background:"#fff", boxShadow:"0 2px 8px rgba(0,0,0,0.5)" }}/>
+                </div>
+                <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, color:"#b3b3b3", marginBottom:12 }}>
+                  <span>Comfort</span><span>Maximum discovery</span>
+                </div>
+                <div style={{ display:"flex", gap:8, flexWrap:"wrap", alignItems:"center" }}>
+                  {VIBES.map(v => (
+                    <button key={v.id} onClick={() => toggleVibe(v.id)}
+                      style={{ padding:"6px 14px", borderRadius:500, border:activeVibes.includes(v.id)?"2px solid #1DB954":"1px solid #535353", background:activeVibes.includes(v.id)?"rgba(29,185,84,0.15)":"transparent", color:activeVibes.includes(v.id)?"#1DB954":"#b3b3b3", fontSize:12, fontWeight:600, cursor:"pointer" }}>
+                      {VIBE_LABELS[v.id]}
+                    </button>
+                  ))}
+                  <button onClick={rebuild} disabled={loading}
+                    style={{ marginLeft:"auto", padding:"8px 22px", borderRadius:500, background:"#1DB954", border:"none", color:"#000", fontSize:13, fontWeight:700, cursor:"pointer", opacity:loading?0.7:1 }}>
+                    {loading ? "Tuning…" : "▶ Build mix"}
+                  </button>
+                </div>
+              </div>
+
+              {/* AI banner */}
+              <div style={{ margin:"0 20px 12px", display:"inline-flex", alignItems:"center", gap:6, background:"rgba(29,185,84,0.12)", color:"#1DB954", fontSize:12, fontWeight:600, padding:"5px 12px", borderRadius:999 }}>
+                ★ {aiSource==="groq" ? "AI relevance live — each new pick explained" : "AI relevance active — each new pick explained"}
+              </div>
+
+              {/* Track list */}
+              <div style={{ padding:"0 20px 20px" }}>
+                <div style={{ display:"grid", gridTemplateColumns:"28px 1fr 80px 60px", gap:"0 12px", padding:"8px 8px", borderBottom:"1px solid #2a2a2a", marginBottom:4 }}>
+                  <div style={{ color:"#b3b3b3", fontSize:12 }}>#</div>
+                  <div style={{ color:"#b3b3b3", fontSize:12 }}>TITLE</div>
+                  <div style={{ color:"#b3b3b3", fontSize:12, textAlign:"right" }}>TAG</div>
+                  <div style={{ color:"#b3b3b3", fontSize:12, textAlign:"right" }}>YEAR</div>
+                </div>
+                {mix.map((track,i) => {
+                  const isPlaying = playing?.id === track.id;
+                  const isNew = track.familiarity === "new";
+                  return (
+                    <div key={track.id} onClick={() => setPlaying(track)}
+                      style={{ display:"grid", gridTemplateColumns:"28px 1fr 80px 60px", gap:"0 12px", padding:"10px 8px", borderRadius:4, cursor:"pointer", background:isPlaying?"rgba(255,255,255,0.07)":"transparent", alignItems:"start" }}
+                      onMouseEnter={e => { if(!isPlaying) e.currentTarget.style.background="#2a2a2a"; }}
+                      onMouseLeave={e => { if(!isPlaying) e.currentTarget.style.background=isPlaying?"rgba(255,255,255,0.07)":"transparent"; }}>
+                      <div style={{ color:isPlaying?"#1DB954":"#b3b3b3", fontSize:13, paddingTop:4, textAlign:"center" }}>
+                        {isPlaying ? (
+                          <svg width="14" height="14" viewBox="0 0 14 14" fill="#1DB954">
+                            <rect x="1" y="3" width="2" height="8" rx="1"><animate attributeName="height" values="8;3;8" dur="0.8s" repeatCount="indefinite"/><animate attributeName="y" values="3;5.5;3" dur="0.8s" repeatCount="indefinite"/></rect>
+                            <rect x="5" y="1" width="2" height="12" rx="1"><animate attributeName="height" values="12;4;12" dur="0.7s" repeatCount="indefinite"/><animate attributeName="y" values="1;5;1" dur="0.7s" repeatCount="indefinite"/></rect>
+                            <rect x="9" y="2" width="2" height="10" rx="1"><animate attributeName="height" values="10;6;10" dur="0.9s" repeatCount="indefinite"/><animate attributeName="y" values="2;4;2" dur="0.9s" repeatCount="indefinite"/></rect>
+                          </svg>
+                        ) : i+1}
                       </div>
-                      <div className="tc-text">
-                        <div className={"tc-name" + (isPlaying ? " green" : "")}>{t.title}</div>
-                        <div className="tc-artist">{t.artist}</div>
-                        {t.isNew && (
-                          <div className="tc-why">
-                            <span className="ai-tag">AI</span>
-                            {loading && !reasons[t.id]
-                              ? "Reasoning over fresh tracks…"
-                              : reasons[t.id] || "Picked to fit your vibe but expand your taste."}
+                      <div>
+                        <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                          <div style={{ width:40, height:40, borderRadius:2, background:`hsl(${(i*47+120)%360},40%,25%)`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:700, color:isPlaying?"#1DB954":"rgba(255,255,255,0.7)", flexShrink:0 }}>
+                            {track.artist.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase()}
                           </div>
-                        )}
+                          <div>
+                            <div style={{ fontSize:14, color:isPlaying?"#1DB954":"#fff", fontWeight:500 }}>{track.title}</div>
+                            <div style={{ fontSize:12, color:"#b3b3b3" }}>{track.artist}</div>
+                            {isNew && (
+                              <div style={{ fontSize:11, color:"#1DB954", marginTop:3, display:"flex", alignItems:"center", gap:4 }}>
+                                <span style={{ background:"#1DB954", color:"#000", borderRadius:2, padding:"0 4px", fontSize:9, fontWeight:700 }}>AI</span>
+                                {loading && !reasons[track.id] ? "Reasoning…" : reasons[track.id] || "Picked to fit your vibe but expand your taste."}
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </div>
+                      <div style={{ textAlign:"right", paddingTop:10 }}>
+                        {isNew
+                          ? <span style={{ border:"1px solid #1DB954", color:"#1DB954", borderRadius:500, padding:"2px 10px", fontSize:11, fontWeight:600 }}>New</span>
+                          : <span style={{ color:"#b3b3b3", fontSize:12 }}>In rotation</span>}
+                      </div>
+                      <div style={{ color:"#b3b3b3", fontSize:13, paddingTop:12, textAlign:"right" }}>{track.year}</div>
                     </div>
-                    <div className="tc tc-album">{vibe?.label.split(" ")[0]} mix</div>
-                    <div className="tc tc-tag">
-                      {t.isNew
-                        ? <span className="badge new">New</span>
-                        : <span className="badge-fam">In rotation</span>}
-                    </div>
-                    <div className="tc tc-year">{t.year}</div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
+            <div style={{ textAlign:"center", color:"#4a4a4a", fontSize:11, marginTop:16 }}>Concept feature · not affiliated with Spotify · representative track pool</div>
+          </div>
+        </div>
 
-            <div className="foot-note">
-              Concept feature · not affiliated with Spotify · representative track pool
+        {/* RIGHT PANEL */}
+        <div style={{ width:280, background:"#121212", borderRadius:8, flexShrink:0, overflow:"hidden", display:"flex", flexDirection:"column" }}>
+          <div style={{ padding:16 }}>
+            <div style={{ fontSize:14, fontWeight:700, marginBottom:12 }}>
+              {currentTrack.title} <span style={{ color:"#b3b3b3", fontWeight:400 }}>· {currentTrack.artist}</span>
+            </div>
+            <div style={{ width:"100%", paddingBottom:"100%", background:"linear-gradient(135deg,#1a5c2e,#0d3018)", borderRadius:8, position:"relative", marginBottom:12 }}>
+              <div style={{ position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"center", fontSize:48 }}>◎</div>
+            </div>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+              <div>
+                <div style={{ fontSize:15, fontWeight:700 }}>{currentTrack.title}</div>
+                <div style={{ fontSize:13, color:"#b3b3b3" }}>{currentTrack.artist}</div>
+              </div>
+              <button style={{ background:"transparent", border:"none", color:"#b3b3b3", fontSize:20, cursor:"pointer" }}>♡</button>
             </div>
           </div>
-        </main>
-
-        {/* RIGHT NOW PLAYING PANEL */}
-        <aside className="rightpanel">
-          <div className="rp-head">
-            <div className="rp-title">{nowPlaying?.title || "Discovery Mix"}</div>
-            <div className="rp-tools">
-              <button className="rp-tool" aria-label="More">
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="#b3b3b3"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
-              </button>
-              <button className="rp-tool" aria-label="Close">
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="#b3b3b3"><path d="M6.41 5L5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41 17.59 5 12 10.59z"/></svg>
-              </button>
+          <div style={{ padding:"0 16px 8px", fontSize:13, fontWeight:700 }}>About the artist</div>
+          <div style={{ flex:1, overflowY:"auto", padding:"0 16px 16px" }}>
+            <div style={{ background:"#282828", borderRadius:8, overflow:"hidden" }}>
+              <div style={{ height:100, background:"linear-gradient(135deg,#8B6914,#c8a84b)", display:"flex", alignItems:"flex-end", padding:12 }}>
+                <span style={{ fontWeight:700, fontSize:14 }}>{currentTrack.artist}</span>
+              </div>
+              <div style={{ padding:12 }}>
+                <div style={{ fontSize:12, color:"#b3b3b3", marginBottom:6 }}>Indie / Alternative</div>
+                <div style={{ fontSize:12, color:"#b3b3b3", lineHeight:1.5 }}>An artist in your Discovery Mix — added because they share your vibe.</div>
+              </div>
             </div>
+            <div style={{ marginTop:16, fontSize:13, fontWeight:700, marginBottom:8 }}>Next in mix</div>
+            {mix.slice(1,4).map((t,i) => (
+              <div key={t.id} onClick={() => setPlaying(t)}
+                style={{ display:"flex", alignItems:"center", gap:10, padding:"8px 0", cursor:"pointer", borderBottom:"1px solid #2a2a2a" }}>
+                <div style={{ width:36, height:36, borderRadius:2, background:`hsl(${(i*80+200)%360},35%,25%)`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, fontWeight:700, flexShrink:0 }}>
+                  {t.artist.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase()}
+                </div>
+                <div style={{ minWidth:0 }}>
+                  <div style={{ fontSize:13, fontWeight:500, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{t.title}</div>
+                  <div style={{ fontSize:12, color:"#b3b3b3" }}>{t.artist}</div>
+                </div>
+                {t.familiarity==="new" && <span style={{ fontSize:10, color:"#1DB954", border:"1px solid #1DB954", borderRadius:500, padding:"1px 6px", flexShrink:0 }}>New</span>}
+              </div>
+            ))}
           </div>
-
-          <div className="rp-art" style={{
-            background: `linear-gradient(135deg, ${nowPlayingPalette[0]}, ${nowPlayingPalette[1]})`
-          }}>
-            <span className="rp-art-init">{nowPlaying ? initials(nowPlaying.artist) : "DM"}</span>
-          </div>
-
-          <div className="rp-track">
-            <div className="rp-track-name">{nowPlaying?.title || "—"}</div>
-            <div className="rp-track-artist">{nowPlaying?.artist || ""}</div>
-          </div>
-
-          <div className="rp-card">
-            <div className="rp-card-head">
-              <span>About the artist</span>
-            </div>
-            <div className="rp-artist-bg" style={{
-              background: `linear-gradient(180deg, ${nowPlayingPalette[0]}55, ${nowPlayingPalette[1]}aa)`
-            }}>
-              <div className="rp-artist-listeners">2,143,508 monthly listeners</div>
-            </div>
-            <div className="rp-artist-body">
-              <p>Sits comfortably inside the <strong>{vibe?.label.toLowerCase()}</strong> world — the dial keeps adding adjacent voices that share the mood but stretch it.</p>
-            </div>
-          </div>
-
-          <div className="rp-card">
-            <div className="rp-card-head">
-              <span>Next from your dial</span>
-              <span className="rp-card-link">Show all</span>
-            </div>
-            <div className="rp-next">
-              {mix.slice(1, 4).map((t) => {
-                const [c1, c2] = artGradient(t.artist);
-                return (
-                  <div key={t.id} className="rp-next-row">
-                    <div className="rp-next-art" style={{ background: `linear-gradient(135deg, ${c1}, ${c2})` }}>
-                      {initials(t.artist)}
-                    </div>
-                    <div className="rp-next-meta">
-                      <div className="rp-next-name">{t.title}</div>
-                      <div className="rp-next-artist">{t.artist}{t.isNew ? " · new" : ""}</div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </aside>
+        </div>
       </div>
 
-      {/* BOTTOM NOW PLAYING BAR */}
-      <div className="nowbar">
-        <div className="nb-left">
-          <div className="nb-art" style={{
-            background: `linear-gradient(135deg, ${nowPlayingPalette[0]}, ${nowPlayingPalette[1]})`
-          }}>
-            <span className="nb-art-init">{nowPlaying ? initials(nowPlaying.artist) : "DM"}</span>
+      {/* BOTTOM BAR */}
+      <div style={{ height:72, background:"#181818", borderTop:"1px solid #282828", display:"flex", alignItems:"center", padding:"0 16px", gap:16, flexShrink:0, zIndex:10 }}>
+        <div style={{ display:"flex", alignItems:"center", gap:12, width:260, flexShrink:0 }}>
+          <div style={{ width:48, height:48, borderRadius:4, background:"linear-gradient(135deg,#1a5c2e,#0d3018)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, flexShrink:0 }}>◎</div>
+          <div style={{ minWidth:0 }}>
+            <div style={{ fontSize:14, fontWeight:500, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{currentTrack.title}</div>
+            <div style={{ fontSize:12, color:"#b3b3b3" }}>{currentTrack.artist}</div>
           </div>
-          <div className="nb-meta">
-            <div className="nb-title">{nowPlaying?.title || "Discovery Mix"}</div>
-            <div className="nb-artist">{nowPlaying?.artist || "Made for you"}</div>
-          </div>
-          <button className="nb-icon" aria-label="Add to library">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#b3b3b3" strokeWidth="1.7"><circle cx="12" cy="12" r="10"/><path d="M8 12h8M12 8v8" strokeLinecap="round"/></svg>
-          </button>
-          <button className="nb-icon" aria-label="Picture-in-picture">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="#b3b3b3"><path d="M3 5h18v14H3V5zm2 2v10h14V7H5zm8 4h6v4h-6v-4z"/></svg>
-          </button>
+          <button style={{ background:"transparent", border:"none", color:"#1DB954", fontSize:18, cursor:"pointer" }}>♥</button>
+          <button style={{ background:"transparent", border:"none", color:"#b3b3b3", fontSize:14, cursor:"pointer" }}>⊞</button>
         </div>
-
-        <div className="nb-center">
-          <div className="nb-controls">
-            <button className="nb-ctrl" aria-label="Shuffle">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="#1ed760"><path d="M13.151 4.5l1.064-1.5H21v3h-4.999l-1.064 1.5h-1.786zm6.788 0v3l3-1.5-3-1.5zM3 7h4.999l4.063 5.5L7.999 18H3v-3h2.999l1.999-2.5L5.999 10H3V7zm17 9.5l-1.064-1.5h-2.93l3.057 4.5h2.937v-3H20.94z"/></svg>
+        <div style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:6 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:20 }}>
+            <button style={{ background:"transparent", border:"none", color:"#b3b3b3", fontSize:18, cursor:"pointer" }}>⇄</button>
+            <button style={{ background:"transparent", border:"none", color:"#b3b3b3", fontSize:22, cursor:"pointer" }}>⏮</button>
+            <button onClick={() => setPlaying(p => p ? null : mix[0])}
+              style={{ width:36, height:36, borderRadius:"50%", background:"#fff", border:"none", color:"#000", fontSize:16, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer" }}>
+              {playing ? "⏸" : "▶"}
             </button>
-            <button className="nb-ctrl" aria-label="Previous">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="#fff"><path d="M3.3 1a.7.7 0 01.7.7v5.15l9.95-5.744a.7.7 0 011.05.606v12.575a.7.7 0 01-1.05.607L4 8.149V13.3a.7.7 0 01-.7.7H1.7a.7.7 0 01-.7-.7V1.7a.7.7 0 01.7-.7h1.6z"/></svg>
-            </button>
-            <button className="nb-play" aria-label="Play">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="#000"><path d="M7.05 3.606l13.49 7.788a.7.7 0 010 1.212L7.05 20.394A.7.7 0 016 19.788V4.212a.7.7 0 011.05-.606z"/></svg>
-            </button>
-            <button className="nb-ctrl" aria-label="Next">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="#fff"><path d="M20.7 1a.7.7 0 00-.7.7v5.15L10.05 1.106a.7.7 0 00-1.05.606v12.575a.7.7 0 001.05.607L20 8.149V13.3a.7.7 0 00.7.7h1.6a.7.7 0 00.7-.7V1.7a.7.7 0 00-.7-.7h-1.6z" transform="rotate(180 12 12)"/></svg>
-            </button>
-            <button className="nb-ctrl" aria-label="Repeat">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="#b3b3b3"><path d="M0 4.75A3.75 3.75 0 013.75 1h16.5A3.75 3.75 0 0124 4.75v5a3.75 3.75 0 01-3.75 3.75H5.81l2.47 2.47a.75.75 0 11-1.06 1.06L3.4 13.21a.75.75 0 010-1.06l3.82-3.82a.75.75 0 011.06 1.06L5.81 12h14.44a2.25 2.25 0 002.25-2.25v-5a2.25 2.25 0 00-2.25-2.25H3.75A2.25 2.25 0 001.5 4.75v5a.75.75 0 01-1.5 0v-5z"/></svg>
-            </button>
+            <button style={{ background:"transparent", border:"none", color:"#b3b3b3", fontSize:22, cursor:"pointer" }}>⏭</button>
+            <button style={{ background:"transparent", border:"none", color:"#b3b3b3", fontSize:18, cursor:"pointer" }}>↺</button>
           </div>
-          <div className="nb-scrub">
-            <span className="nb-time">1:24</span>
-            <div className="nb-track">
-              <div className="nb-track-fill" />
-              <div className="nb-track-knob" />
+          <div style={{ display:"flex", alignItems:"center", gap:8, width:"100%" }}>
+            <span style={{ fontSize:11, color:"#b3b3b3", flexShrink:0 }}>1:24</span>
+            <div style={{ flex:1, height:4, background:"#535353", borderRadius:2, cursor:"pointer" }}>
+              <div style={{ width:"37%", height:"100%", background:"#fff", borderRadius:2 }}/>
             </div>
-            <span className="nb-time">3:48</span>
+            <span style={{ fontSize:11, color:"#b3b3b3", flexShrink:0 }}>3:48</span>
           </div>
         </div>
-
-        <div className="nb-right">
-          <button className="nb-icon" aria-label="Now playing view"><svg viewBox="0 0 24 24" width="16" height="16" fill="#b3b3b3"><path d="M11.196 8L15 14H7.196l4-6z"/></svg></button>
-          <button className="nb-icon" aria-label="Lyrics"><svg viewBox="0 0 24 24" width="16" height="16" fill="#b3b3b3"><path d="M14 13.5h-2v3h2v-3zm-2-2h2v-2h-2v2zM4 4v16h16V4H4zm14 14H6V6h12v12z"/></svg></button>
-          <button className="nb-icon" aria-label="Queue"><svg viewBox="0 0 24 24" width="16" height="16" fill="#b3b3b3"><path d="M15 15H3v2h12v-2zm0-4H3v2h12v-2zM3 7v2h12V7H3zm14 0v2h2V7h-2zm0 6h2v-2h-2v2zm0 4h2v-2h-2v2z"/></svg></button>
-          <button className="nb-icon" aria-label="Connect to a device"><svg viewBox="0 0 24 24" width="16" height="16" fill="#b3b3b3"><path d="M6 2.75A.75.75 0 016.75 2h10.5a.75.75 0 01.75.75v18.5a.75.75 0 01-1.28.53L12 17.06l-4.72 4.72A.75.75 0 016 21.25V2.75z"/></svg></button>
-          <div className="nb-vol">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="#b3b3b3"><path d="M9.741.85a.75.75 0 01.375.65v21a.75.75 0 01-1.125.65l-6.925-4H1.25a.75.75 0 01-.75-.75v-12.5a.75.75 0 01.75-.75h.816L8.99 1.15a.75.75 0 01.751-.3zM14.45 6.5a.75.75 0 011.05-.15 9.97 9.97 0 014 8c0 3.2-1.52 6.05-3.86 7.86a.75.75 0 11-.92-1.18A8.47 8.47 0 0018 14.35a8.47 8.47 0 00-3.4-6.78.75.75 0 01-.15-1.07z"/></svg>
-            <div className="nb-voltrack">
-              <div className="nb-volfill" />
-              <div className="nb-volknob" />
+        <div style={{ display:"flex", alignItems:"center", gap:10, width:200, justifyContent:"flex-end", flexShrink:0 }}>
+          <button style={{ background:"transparent", border:"none", color:"#b3b3b3", fontSize:16, cursor:"pointer" }}>🎤</button>
+          <button style={{ background:"transparent", border:"none", color:"#b3b3b3", fontSize:16, cursor:"pointer" }}>☰</button>
+          <button style={{ background:"transparent", border:"none", color:"#b3b3b3", fontSize:16, cursor:"pointer" }}>📱</button>
+          <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+            <span style={{ fontSize:14, color:"#b3b3b3" }}>🔊</span>
+            <div style={{ width:80, height:4, background:"#535353", borderRadius:2, cursor:"pointer" }}>
+              <div style={{ width:"70%", height:"100%", background:"#fff", borderRadius:2 }}/>
             </div>
           </div>
-          <button className="nb-icon" aria-label="Fullscreen"><svg viewBox="0 0 24 24" width="16" height="16" fill="#b3b3b3"><path d="M3 3h7v2H5v5H3V3zm11 0h7v7h-2V5h-5V3zM3 14h2v5h5v2H3v-7zm16 0h2v7h-7v-2h5v-5z"/></svg></button>
+          <button style={{ background:"transparent", border:"none", color:"#b3b3b3", fontSize:14, cursor:"pointer" }}>⤢</button>
         </div>
       </div>
     </div>

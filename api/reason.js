@@ -10,16 +10,19 @@ export default async function handler(req, res) {
   const { vibeLabel, vibeSeed, tracks } = body || {};
   const list = Array.isArray(tracks) ? tracks.slice(0, 8) : [];
 
-  const fallback = () =>
-    list.map((t) => ({
-      id: t.id,
-      why: `Shares the ${vibeSeed?.split(",")[0]?.trim() || "core"} feel of the vibe, but from a lesser-known artist that pushes past the usual rotation.`,
-    }));
+  const fallback = (debug) =>
+    res.status(200).json({
+      source: "fallback",
+      debug,
+      reasons: list.map((t) => ({
+        id: t.id,
+        why: `Shares the ${vibeSeed?.split(",")[0]?.trim() || "core"} feel of the vibe, but from a lesser-known artist that pushes past the usual rotation.`,
+      })),
+    });
 
   const key = process.env.GROQ_API_KEY;
-  if (!key || list.length === 0) {
-    return res.status(200).json({ source: "fallback", reasons: fallback() });
-  }
+  if (!key) return fallback("NO_KEY");
+  if (list.length === 0) return fallback("NO_TRACKS");
 
   const prompt = `You are a music critic writing one-line liner notes for a discovery playlist. The chosen vibe is "${vibeLabel}" — ${vibeSeed}.
 
@@ -28,7 +31,7 @@ Below are lesser-known tracks slotted into this vibe to stretch the listener's t
 STRICT RULES:
 - Each sentence MUST be distinct. Never repeat phrasing, opening words, or sentence structure across tracks.
 - Pick ONE angle per track: texture/sound, era/scene, mood shift, energy contrast, lyrical bent, production feel. Use a DIFFERENT angle for each track.
-- Be concrete. Avoid generic praise ("great", "amazing", "perfect").
+- Be concrete. Avoid generic praise.
 - Do NOT use "you" or "your".
 - Do NOT repeat the track title or artist name.
 
@@ -53,27 +56,46 @@ Respond ONLY with a JSON array like [{"i":1,"why":"..."},{"i":2,"why":"..."}]. N
       }),
     });
 
-    if (!r.ok) return res.status(200).json({ source: "fallback", reasons: fallback() });
+    const statusCode = r.status;
+    const rawText = await r.text();
 
-    const data = await r.json();
+    if (!r.ok) {
+      return res.status(200).json({
+        source: "fallback",
+        debug: `GROQ_${statusCode}`,
+        groq_error: rawText.slice(0, 300),
+        reasons: list.map((t) => ({ id: t.id, why: "fallback" })),
+      });
+    }
+
+    let data;
+    try { data = JSON.parse(rawText); } catch {
+      return res.status(200).json({ source: "fallback", debug: "JSON_PARSE_FAIL", raw: rawText.slice(0, 200), reasons: list.map(t=>({id:t.id,why:"fallback"})) });
+    }
+
     let text = data?.choices?.[0]?.message?.content?.trim() || "";
     text = text.replace(/```json/gi, "").replace(/```/g, "").trim();
 
     let parsed;
-    try { parsed = JSON.parse(text); } catch { parsed = null; }
-    if (!Array.isArray(parsed)) return res.status(200).json({ source: "fallback", reasons: fallback() });
+    try { parsed = JSON.parse(text); } catch {
+      return res.status(200).json({ source: "fallback", debug: "RESPONSE_PARSE_FAIL", llm_said: text.slice(0, 300), reasons: list.map(t=>({id:t.id,why:"fallback"})) });
+    }
+
+    if (!Array.isArray(parsed)) {
+      return res.status(200).json({ source: "fallback", debug: "NOT_ARRAY", parsed_type: typeof parsed, reasons: list.map(t=>({id:t.id,why:"fallback"})) });
+    }
 
     const seen = new Set();
     const reasons = list.map((t, idx) => {
       const match = parsed.find((p) => Number(p.i) === idx + 1);
-      let why = match?.why || fallback()[idx].why;
-      if (seen.has(why.toLowerCase().trim())) why = fallback()[idx].why;
+      let why = match?.why || "fallback";
+      if (seen.has(why.toLowerCase().trim())) why = "dedup_fallback";
       seen.add(why.toLowerCase().trim());
       return { id: t.id, why };
     });
 
     return res.status(200).json({ source: "groq", reasons });
-  } catch {
-    return res.status(200).json({ source: "fallback", reasons: fallback() });
+  } catch (err) {
+    return res.status(200).json({ source: "fallback", debug: "EXCEPTION", error_message: err.message, reasons: list.map(t=>({id:t.id,why:"fallback"})) });
   }
 }

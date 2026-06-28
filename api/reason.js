@@ -48,7 +48,7 @@ Respond ONLY with a JSON array like [{"i":1,"why":"..."},{"i":2,"why":"..."}]. N
         Authorization: `Bearer ${key}`,
       },
       body: JSON.stringify({
-        model: "llama3-8b-8192",
+        model:"llama-3.1-8b-instant",
         temperature: 0.85,
         top_p: 0.95,
         max_tokens: 600,

@@ -31,6 +31,30 @@ function buildMix(activeVibes, dialPct) {
   return shuffle(picked);
 }
 
+// ── Relevance Anchor — visible per-track match signal ────────────────
+// This is the feature that answers the skeptic from the interviews
+// (Imran: "random isn't discovery, it's noise"). It surfaces HOW well a
+// new track matches the current vibe selection, not just the AI's
+// freeform sentence. Score is derived from how many tracks in the
+// active vibe set share this track's mood, as a simple, legible proxy
+// for "does this still fit what I asked for."
+function relevanceScore(track, activeVibes) {
+  if (!activeVibes.includes(track.vibe)) return "low";
+  const pool = TRACKS.filter(t => activeVibes.includes(t.vibe) && t.familiarity === "familiar");
+  if (!pool.length) return "medium";
+  const moodMatches = pool.filter(t => t.mood === track.mood).length;
+  const ratio = moodMatches / pool.length;
+  if (ratio >= 0.3) return "high";
+  if (ratio >= 0.12) return "medium";
+  return "low";
+}
+
+const RELEVANCE_STYLE = {
+  high:   { label: "Strong match",   color: "#1DB954" },
+  medium: { label: "Good match",     color: "#d9c75a" },
+  low:    { label: "Wider stretch",  color: "#e08a4f" },
+};
+
 export default function App() {
   const [activeVibes, setActiveVibes] = useState(["indie"]);
   const [dial, setDial] = useState(25);
@@ -42,13 +66,20 @@ export default function App() {
   const [activePlaylist, setActivePlaylist] = useState("p7");
   const sliderRef = useRef(null);
 
-  // ── Save / Skip state ──────────────────────────────────────────────
+  // ── Save / Skip state — SESSION-WIDE, not per-mix ──────────────────
   // Session-only (in-memory) saved-track set. This is intentional for the
   // prototype: it proves the interaction model (new track -> saved ->
   // counts toward Discovery Success Rate) without needing a backend.
   // Production would persist this to Spotify's user profile / taste graph.
+  // NOTE: these persist ACROSS dial adjustments / rebuilds within a
+  // session, so the DSR counter reflects the whole session, not just
+  // whatever mix happens to be on screen right now.
   const [saved, setSaved] = useState(new Set());
   const [skipped, setSkipped] = useState(new Set());
+  // Every new track that has ever appeared in a generated mix this
+  // session (across all dial/vibe changes), keyed by id -> track object.
+  // This is the denominator for the session-wide DSR counter.
+  const [allNewSeen, setAllNewSeen] = useState(new Map());
 
   const dialLabel = dial <= 15 ? "Comfort zone" : dial <= 35 ? "Mostly familiar" : dial <= 60 ? "Adventurous" : "Maximum discovery";
   const newCount = mix.filter(t => t.familiarity === "new").length;
@@ -56,7 +87,14 @@ export default function App() {
 
   // DSR-relevant counters, surfaced directly so the demo visibly proves
   // the metric is trackable (not just claimed).
-  const newSavedCount = mix.filter(t => t.familiarity === "new" && saved.has(t.id)).length;
+  // DSR-relevant counters, surfaced directly so the demo visibly proves
+  // the metric is trackable (not just claimed).
+  // Session-wide: counts across ALL mixes generated this session, not
+  // just the current one on screen — reflects a full discovery session
+  // the way Aditya describes it ("I'd crank it to eighty on a Saturday"),
+  // not a single static playlist.
+  const newSeenCount = allNewSeen.size;
+  const newSavedCount = [...allNewSeen.keys()].filter(id => saved.has(id)).length;
 
   const vibeLabel = activeVibes.map(id => VIBES.find(v => v.id === id)?.label).filter(Boolean).join(" + ");
   const vibeSeed  = activeVibes.map(id => VIBES.find(v => v.id === id)?.seed).filter(Boolean).join(", ");
@@ -66,8 +104,14 @@ export default function App() {
     setMix(newMix);
     setReasons({});
     setAiSource(null);
-    setSaved(new Set());   // fresh mix = fresh session signal
-    setSkipped(new Set());
+    // NOTE: saved/skipped are intentionally NOT reset here — they persist
+    // across rebuilds so the DSR counter reflects the whole session.
+    // Accumulate any new tracks from this mix into the session-wide set.
+    setAllNewSeen(prev => {
+      const next = new Map(prev);
+      newMix.filter(t => t.familiarity === "new").forEach(t => next.set(t.id, t));
+      return next;
+    });
     if (newMix.length) setPlaying(newMix[0]);
     const newOnes = newMix.filter(t => t.familiarity === "new");
     if (!newOnes.length) return;
@@ -299,9 +343,9 @@ export default function App() {
                     <div style={{ fontSize:14, color:"rgba(255,255,255,0.7)", marginBottom:4 }}>Tuned to your dial — fresh music, on your terms.</div>
                     <div style={{ fontSize:13, color:"rgba(255,255,255,0.6)" }}>
                       Made for you · {mix.length} songs · <span style={{ color:"#1DB954", fontWeight:600 }}>{newCount} new</span> mixed in
-                      {newCount > 0 && (
+                      {newSeenCount > 0 && (
                         <span style={{ marginLeft:10, color:"rgba(255,255,255,0.55)" }}>
-                          · <span style={{ color:"#1DB954", fontWeight:600 }}>{newSavedCount}/{newCount}</span> new saved this session
+                          · <span style={{ color:"#1DB954", fontWeight:600 }}>{newSavedCount}/{newSeenCount}</span> new saved this session
                         </span>
                       )}
                     </div>
@@ -363,6 +407,8 @@ export default function App() {
                   const isNew = track.familiarity === "new";
                   const isSaved = saved.has(track.id);
                   const wasSkipped = skipped.has(track.id);
+                  const rel = isNew ? relevanceScore(track, activeVibes) : null;
+                  const relStyle = rel ? RELEVANCE_STYLE[rel] : null;
                   return (
                     <div key={track.id} onClick={() => setPlaying(track)}
                       style={{ display:"grid", gridTemplateColumns:"28px 1fr 36px 80px 60px", gap:"0 12px", padding:"10px 8px", borderRadius:4, cursor:"pointer", background:isPlaying?"rgba(255,255,255,0.07)":"transparent", alignItems:"start", opacity:wasSkipped?0.55:1 }}
@@ -389,9 +435,25 @@ export default function App() {
                             </div>
                             <div style={{ fontSize:12, color:"#b3b3b3" }}>{track.artist}</div>
                             {isNew && (
-                              <div style={{ fontSize:11, color:"#1DB954", marginTop:3, display:"flex", alignItems:"center", gap:4 }}>
+                              <div style={{ fontSize:11, color:"#1DB954", marginTop:3, display:"flex", alignItems:"center", gap:4, flexWrap:"wrap" }}>
                                 <span style={{ background:"#1DB954", color:"#000", borderRadius:2, padding:"0 4px", fontSize:9, fontWeight:700 }}>AI</span>
                                 {loading && !reasons[track.id] ? "Reasoning…" : reasons[track.id] || "Picked to fit your vibe but expand your taste."}
+                                {relStyle && (
+                                  <span
+                                    title="Relevance Anchor — how closely this new pick matches your current vibe"
+                                    style={{
+                                      marginLeft: 2,
+                                      fontSize: 9,
+                                      fontWeight: 700,
+                                      color: relStyle.color,
+                                      border: `1px solid ${relStyle.color}`,
+                                      borderRadius: 500,
+                                      padding: "1px 7px",
+                                      flexShrink: 0,
+                                    }}>
+                                    ● {relStyle.label}
+                                  </span>
+                                )}
                               </div>
                             )}
                           </div>

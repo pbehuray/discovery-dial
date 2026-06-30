@@ -42,9 +42,21 @@ export default function App() {
   const [activePlaylist, setActivePlaylist] = useState("p7");
   const sliderRef = useRef(null);
 
+  // ── Save / Skip state ──────────────────────────────────────────────
+  // Session-only (in-memory) saved-track set. This is intentional for the
+  // prototype: it proves the interaction model (new track -> saved ->
+  // counts toward Discovery Success Rate) without needing a backend.
+  // Production would persist this to Spotify's user profile / taste graph.
+  const [saved, setSaved] = useState(new Set());
+  const [skipped, setSkipped] = useState(new Set());
+
   const dialLabel = dial <= 15 ? "Comfort zone" : dial <= 35 ? "Mostly familiar" : dial <= 60 ? "Adventurous" : "Maximum discovery";
   const newCount = mix.filter(t => t.familiarity === "new").length;
   const currentTrack = playing || mix[0] || { title:"Discovery Mix", artist:"purbasha" };
+
+  // DSR-relevant counters, surfaced directly so the demo visibly proves
+  // the metric is trackable (not just claimed).
+  const newSavedCount = mix.filter(t => t.familiarity === "new" && saved.has(t.id)).length;
 
   const vibeLabel = activeVibes.map(id => VIBES.find(v => v.id === id)?.label).filter(Boolean).join(" + ");
   const vibeSeed  = activeVibes.map(id => VIBES.find(v => v.id === id)?.seed).filter(Boolean).join(", ");
@@ -54,6 +66,8 @@ export default function App() {
     setMix(newMix);
     setReasons({});
     setAiSource(null);
+    setSaved(new Set());   // fresh mix = fresh session signal
+    setSkipped(new Set());
     if (newMix.length) setPlaying(newMix[0]);
     const newOnes = newMix.filter(t => t.familiarity === "new");
     if (!newOnes.length) return;
@@ -95,6 +109,51 @@ export default function App() {
     const rect = sliderRef.current.getBoundingClientRect();
     const pct = Math.max(0, Math.min(100, Math.round(((e.clientX - rect.left) / rect.width) * 100)));
     setDial(pct);
+  }
+
+  // ── Save toggle ──────────────────────────────────────────────────
+  // This is the literal numerator of Discovery Success Rate:
+  // DSR = % of new tracks played past 30s AND saved/liked.
+  function toggleSave(trackId, e) {
+    e.stopPropagation(); // don't trigger setPlaying when clicking the heart
+    setSaved(prev => {
+      const next = new Set(prev);
+      if (next.has(trackId)) next.delete(trackId);
+      else next.add(trackId);
+      return next;
+    });
+  }
+
+  // ── Skip ─────────────────────────────────────────────────────────
+  // A skip on a NEW track is recorded separately from a skip on a
+  // familiar track. In this prototype that distinction is surfaced as a
+  // visible "skipped" tag rather than feeding back into the dial — the
+  // actual signal-reweighting logic (skip-while-dial-is-high = "wrong
+  // track" not "wrong direction") is explained on the deck slide, not
+  // reimplemented here.
+  function playNext(fromTrack) {
+    if (!mix.length) return;
+    const idx = mix.findIndex(t => t.id === fromTrack?.id);
+    const next = mix[(idx + 1) % mix.length];
+    setPlaying(next);
+    return next;
+  }
+
+  function handleSkip(e) {
+    e?.stopPropagation?.();
+    const skippedTrack = currentTrack;
+    if (skippedTrack?.id) {
+      setSkipped(prev => new Set(prev).add(skippedTrack.id));
+    }
+    playNext(skippedTrack);
+  }
+
+  function handlePrev(e) {
+    e?.stopPropagation?.();
+    if (!mix.length) return;
+    const idx = mix.findIndex(t => t.id === currentTrack?.id);
+    const prevIdx = (idx - 1 + mix.length) % mix.length;
+    setPlaying(mix[prevIdx]);
   }
 
   return (
@@ -240,6 +299,11 @@ export default function App() {
                     <div style={{ fontSize:14, color:"rgba(255,255,255,0.7)", marginBottom:4 }}>Tuned to your dial — fresh music, on your terms.</div>
                     <div style={{ fontSize:13, color:"rgba(255,255,255,0.6)" }}>
                       Made for you · {mix.length} songs · <span style={{ color:"#1DB954", fontWeight:600 }}>{newCount} new</span> mixed in
+                      {newCount > 0 && (
+                        <span style={{ marginLeft:10, color:"rgba(255,255,255,0.55)" }}>
+                          · <span style={{ color:"#1DB954", fontWeight:600 }}>{newSavedCount}/{newCount}</span> new saved this session
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -287,18 +351,21 @@ export default function App() {
 
               {/* Track list */}
               <div style={{ padding:"0 20px 20px" }}>
-                <div style={{ display:"grid", gridTemplateColumns:"28px 1fr 80px 60px", gap:"0 12px", padding:"8px 8px", borderBottom:"1px solid #2a2a2a", marginBottom:4 }}>
+                <div style={{ display:"grid", gridTemplateColumns:"28px 1fr 36px 80px 60px", gap:"0 12px", padding:"8px 8px", borderBottom:"1px solid #2a2a2a", marginBottom:4 }}>
                   <div style={{ color:"#b3b3b3", fontSize:12 }}>#</div>
                   <div style={{ color:"#b3b3b3", fontSize:12 }}>TITLE</div>
+                  <div style={{ color:"#b3b3b3", fontSize:12 }}></div>
                   <div style={{ color:"#b3b3b3", fontSize:12, textAlign:"right" }}>TAG</div>
                   <div style={{ color:"#b3b3b3", fontSize:12, textAlign:"right" }}>YEAR</div>
                 </div>
                 {mix.map((track,i) => {
                   const isPlaying = playing?.id === track.id;
                   const isNew = track.familiarity === "new";
+                  const isSaved = saved.has(track.id);
+                  const wasSkipped = skipped.has(track.id);
                   return (
                     <div key={track.id} onClick={() => setPlaying(track)}
-                      style={{ display:"grid", gridTemplateColumns:"28px 1fr 80px 60px", gap:"0 12px", padding:"10px 8px", borderRadius:4, cursor:"pointer", background:isPlaying?"rgba(255,255,255,0.07)":"transparent", alignItems:"start" }}
+                      style={{ display:"grid", gridTemplateColumns:"28px 1fr 36px 80px 60px", gap:"0 12px", padding:"10px 8px", borderRadius:4, cursor:"pointer", background:isPlaying?"rgba(255,255,255,0.07)":"transparent", alignItems:"start", opacity:wasSkipped?0.55:1 }}
                       onMouseEnter={e => { if(!isPlaying) e.currentTarget.style.background="#2a2a2a"; }}
                       onMouseLeave={e => { if(!isPlaying) e.currentTarget.style.background=isPlaying?"rgba(255,255,255,0.07)":"transparent"; }}>
                       <div style={{ color:isPlaying?"#1DB954":"#b3b3b3", fontSize:13, paddingTop:4, textAlign:"center" }}>
@@ -316,7 +383,10 @@ export default function App() {
                             {track.artist.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase()}
                           </div>
                           <div>
-                            <div style={{ fontSize:14, color:isPlaying?"#1DB954":"#fff", fontWeight:500 }}>{track.title}</div>
+                            <div style={{ fontSize:14, color:isPlaying?"#1DB954":"#fff", fontWeight:500 }}>
+                              {track.title}
+                              {wasSkipped && <span style={{ marginLeft:8, fontSize:10, color:"#888", fontWeight:400 }}>skipped</span>}
+                            </div>
                             <div style={{ fontSize:12, color:"#b3b3b3" }}>{track.artist}</div>
                             {isNew && (
                               <div style={{ fontSize:11, color:"#1DB954", marginTop:3, display:"flex", alignItems:"center", gap:4 }}>
@@ -326,6 +396,15 @@ export default function App() {
                             )}
                           </div>
                         </div>
+                      </div>
+                      {/* SAVE — the literal numerator of Discovery Success Rate */}
+                      <div style={{ paddingTop:8, textAlign:"center" }}>
+                        <button
+                          onClick={(e) => toggleSave(track.id, e)}
+                          title={isSaved ? "Saved" : "Save"}
+                          style={{ background:"transparent", border:"none", cursor:"pointer", fontSize:16, color:isSaved?"#1DB954":"#888", padding:0 }}>
+                          {isSaved ? "♥" : "♡"}
+                        </button>
                       </div>
                       <div style={{ textAlign:"right", paddingTop:10 }}>
                         {isNew
@@ -338,7 +417,7 @@ export default function App() {
                 })}
               </div>
             </div>
-            <div style={{ textAlign:"center", color:"#4a4a4a", fontSize:11, marginTop:16 }}>Concept feature · not affiliated with Spotify · representative track pool</div>
+            <div style={{ textAlign:"center", color:"#4a4a4a", fontSize:11, marginTop:16 }}>Concept feature · not affiliated with Spotify · representative track pool · saves are session-only in this prototype</div>
           </div>
         </div>
 
@@ -356,7 +435,11 @@ export default function App() {
                 <div style={{ fontSize:15, fontWeight:700 }}>{currentTrack.title}</div>
                 <div style={{ fontSize:13, color:"#b3b3b3" }}>{currentTrack.artist}</div>
               </div>
-              <button style={{ background:"transparent", border:"none", color:"#b3b3b3", fontSize:20, cursor:"pointer" }}>♡</button>
+              <button
+                onClick={(e) => currentTrack.id && toggleSave(currentTrack.id, e)}
+                style={{ background:"transparent", border:"none", color:currentTrack.id && saved.has(currentTrack.id) ? "#1DB954" : "#b3b3b3", fontSize:20, cursor:"pointer" }}>
+                {currentTrack.id && saved.has(currentTrack.id) ? "♥" : "♡"}
+              </button>
             </div>
           </div>
           <div style={{ padding:"0 16px 8px", fontSize:13, fontWeight:700 }}>About the artist</div>
@@ -396,18 +479,22 @@ export default function App() {
             <div style={{ fontSize:14, fontWeight:500, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{currentTrack.title}</div>
             <div style={{ fontSize:12, color:"#b3b3b3" }}>{currentTrack.artist}</div>
           </div>
-          <button style={{ background:"transparent", border:"none", color:"#1DB954", fontSize:18, cursor:"pointer" }}>♥</button>
+          <button
+            onClick={(e) => currentTrack.id && toggleSave(currentTrack.id, e)}
+            style={{ background:"transparent", border:"none", color:currentTrack.id && saved.has(currentTrack.id) ? "#1DB954" : "#b3b3b3", fontSize:18, cursor:"pointer" }}>
+            {currentTrack.id && saved.has(currentTrack.id) ? "♥" : "♡"}
+          </button>
           <button style={{ background:"transparent", border:"none", color:"#b3b3b3", fontSize:14, cursor:"pointer" }}>⊞</button>
         </div>
         <div style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:6 }}>
           <div style={{ display:"flex", alignItems:"center", gap:20 }}>
             <button style={{ background:"transparent", border:"none", color:"#b3b3b3", fontSize:18, cursor:"pointer" }}>⇄</button>
-            <button style={{ background:"transparent", border:"none", color:"#b3b3b3", fontSize:22, cursor:"pointer" }}>⏮</button>
+            <button onClick={handlePrev} style={{ background:"transparent", border:"none", color:"#b3b3b3", fontSize:22, cursor:"pointer" }}>⏮</button>
             <button onClick={() => setPlaying(p => p ? null : mix[0])}
               style={{ width:36, height:36, borderRadius:"50%", background:"#fff", border:"none", color:"#000", fontSize:16, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer" }}>
               {playing ? "⏸" : "▶"}
             </button>
-            <button style={{ background:"transparent", border:"none", color:"#b3b3b3", fontSize:22, cursor:"pointer" }}>⏭</button>
+            <button onClick={handleSkip} title="Skip" style={{ background:"transparent", border:"none", color:"#b3b3b3", fontSize:22, cursor:"pointer" }}>⏭</button>
             <button style={{ background:"transparent", border:"none", color:"#b3b3b3", fontSize:18, cursor:"pointer" }}>↺</button>
           </div>
           <div style={{ display:"flex", alignItems:"center", gap:8, width:"100%" }}>

@@ -35,17 +35,25 @@ function buildMix(activeVibes, dialPct) {
 // This is the feature that answers the skeptic from the interviews
 // (Imran: "random isn't discovery, it's noise"). It surfaces HOW well a
 // new track matches the current vibe selection, not just the AI's
-// freeform sentence. Score is derived from how many tracks in the
-// active vibe set share this track's mood, as a simple, legible proxy
-// for "does this still fit what I asked for."
+// freeform sentence.
+//
+// Scoring is based on energy proximity to the familiar tracks in the
+// same vibe (energy is a continuous 1-5 scale, so it clusters
+// meaningfully). An earlier version compared exact mood strings, but
+// new tracks were deliberately written with distinct, varied moods
+// (restless/raw/warm) versus familiar tracks' moods (melancholy/dreamy/
+// groovy) so the AI reasoning would sound rich — which meant mood
+// strings almost never matched and everything fell into "low" by
+// construction, not by genuine relevance. Energy proximity is a more
+// reliable proxy for "does this still fit the moment."
 function relevanceScore(track, activeVibes) {
   if (!activeVibes.includes(track.vibe)) return "low";
   const pool = TRACKS.filter(t => activeVibes.includes(t.vibe) && t.familiarity === "familiar");
   if (!pool.length) return "medium";
-  const moodMatches = pool.filter(t => t.mood === track.mood).length;
-  const ratio = moodMatches / pool.length;
-  if (ratio >= 0.3) return "high";
-  if (ratio >= 0.12) return "medium";
+  const avgEnergy = pool.reduce((sum, t) => sum + t.energy, 0) / pool.length;
+  const diff = Math.abs(track.energy - avgEnergy);
+  if (diff <= 0.75) return "high";
+  if (diff <= 1.75) return "medium";
   return "low";
 }
 

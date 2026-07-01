@@ -434,7 +434,7 @@ export default function App() {
               <div style={{ margin:"0 20px 12px", display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}>
                 <span style={{ fontSize:11, color:"#888", marginRight:4 }}>Filter:</span>
                 {[
-                  { key:null,     label:"All new",       color:"#888" },
+                  { key:null,     label:"All",           color:"#888" },
                   { key:"high",   label:"★ Strong match", color:"#1DB954" },
                   { key:"medium", label:"★ Good match",   color:"#d9c75a" },
                   { key:"low",    label:"★ Wider stretch",color:"#e08a4f" },
@@ -490,11 +490,6 @@ export default function App() {
                       {/* Title + AI line */}
                       <div>
                         <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                          {/* Coloured star relevance — next to album art, not in the AI line */}
-                          {relStyle && (
-                            <span title={`${relStyle.label} — Relevance Anchor`}
-                              style={{ color:relStyle.color, fontSize:16, flexShrink:0 }}>★</span>
-                          )}
                           <div style={{ width:40, height:40, borderRadius:2, background:`hsl(${(i*47+120)%360},40%,25%)`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:700, color:isPlaying?"#1DB954":"rgba(255,255,255,0.7)", flexShrink:0 }}>
                             {track.artist.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase()}
                           </div>
@@ -553,11 +548,22 @@ export default function App() {
                         )}
                       </div>
 
-                      {/* Tag */}
-                      <div style={{ textAlign:"right", paddingTop:10 }}>
-                        {isNew
-                          ? <span style={{ border:"1px solid #1DB954", color:"#1DB954", borderRadius:500, padding:"2px 10px", fontSize:11, fontWeight:600 }}>New</span>
-                          : <span style={{ color:"#b3b3b3", fontSize:12 }}>In rotation</span>}
+                      {/* Tag + relevance star — right side */}
+                      <div style={{ textAlign:"right", paddingTop:8 }}>
+                        {isNew ? (
+                          <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:3 }}>
+                            <span style={{ border:"1px solid #1DB954", color:"#1DB954", borderRadius:500, padding:"2px 10px", fontSize:11, fontWeight:600 }}>New</span>
+                            {relStyle && (
+                              <span
+                                title={`${relStyle.label} — Relevance Anchor`}
+                                style={{ color:relStyle.color, fontSize:13, lineHeight:1 }}>
+                                ★
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span style={{ color:"#b3b3b3", fontSize:12 }}>In rotation</span>
+                        )}
                       </div>
 
                       {/* Year */}

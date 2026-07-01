@@ -90,23 +90,54 @@ export default function App() {
   const vibeSeed  = activeVibes.map(id => VIBES.find(v => v.id === id)?.seed).filter(Boolean).join(", ");
 
   // ── Sorted + filtered display list ───────────────────────────────
-  // New tracks sorted by relevance (high→medium→low), familiar tracks after.
-  // Apply relevance filter on top of that.
+  // New tracks sorted by relevance (Strong→Good→Wider stretch).
+  // Familiar tracks stay in their original shuffled order.
+  // New tracks are then interleaved between familiar ones evenly,
+  // so the mix feels like a real playlist — not a discovery dump on top.
+  // When a filter is active, only matching new tracks are interleaved;
+  // familiar tracks always remain visible as the anchor.
   const displayMix = (() => {
+    // Score all new tracks
     const newTracks = mix
       .filter(t => t.familiarity === "new")
       .map(t => ({ ...t, _rel: relevanceScore(t, activeVibes) }))
       .sort((a, b) => REL_ORDER[a._rel] - REL_ORDER[b._rel]);
+
     const familiarTracks = mix.filter(t => t.familiarity === "familiar");
-    const allSorted = [...newTracks, ...familiarTracks];
-    if (!relFilter) return allSorted;
-    return allSorted.filter(t => {
-      if (t.familiarity !== "new") return true; // always show familiar
-      if (relFilter === "high")   return t._rel === "high";
-      if (relFilter === "medium") return t._rel === "medium";
-      if (relFilter === "low")    return t._rel === "low";
-      return true;
-    });
+
+    // Apply relevance filter — familiar always shown
+    const filteredNew = !relFilter
+      ? newTracks
+      : newTracks.filter(t =>
+          relFilter === "high"   ? t._rel === "high"   :
+          relFilter === "medium" ? t._rel === "medium" :
+          relFilter === "low"    ? t._rel === "low"    : true
+        );
+
+    // Interleave: spread new tracks evenly between familiar ones.
+    // e.g. 5 familiar + 3 new → F N F F N F F N
+    if (!filteredNew.length) return familiarTracks;
+    if (!familiarTracks.length) return filteredNew;
+
+    const result = [];
+    const total = familiarTracks.length + filteredNew.length;
+    // Place a new track every N slots where N = total / newCount
+    const step = total / filteredNew.length;
+    let newIdx = 0;
+    let famIdx = 0;
+    let nextNewAt = step / 2; // start mid-gap so first slot is usually familiar
+
+    for (let i = 0; i < total; i++) {
+      if (newIdx < filteredNew.length && i >= Math.round(nextNewAt) - 1) {
+        result.push(filteredNew[newIdx++]);
+        nextNewAt += step;
+      } else if (famIdx < familiarTracks.length) {
+        result.push(familiarTracks[famIdx++]);
+      } else {
+        result.push(filteredNew[newIdx++]);
+      }
+    }
+    return result;
   })();
 
   async function rebuild() {

@@ -104,7 +104,7 @@ export default function App() {
       if (t.familiarity !== "new") return true; // always show familiar
       if (relFilter === "high")   return t._rel === "high";
       if (relFilter === "medium") return t._rel === "medium";
-      if (relFilter === "both")   return t._rel === "high" || t._rel === "medium";
+      if (relFilter === "low")    return t._rel === "low";
       return true;
     });
   })();
@@ -430,21 +430,21 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Relevance filter chips */}
-              <div style={{ margin:"0 20px 12px", display:"flex", alignItems:"center", gap:8 }}>
-                <span style={{ fontSize:11, color:"#888", marginRight:4 }}>Filter new tracks:</span>
+              {/* Relevance filter chips — 3 tiers + All */}
+              <div style={{ margin:"0 20px 12px", display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}>
+                <span style={{ fontSize:11, color:"#888", marginRight:4 }}>Filter:</span>
                 {[
-                  { key:null,     label:"All" },
-                  { key:"high",   label:"★ Strong match" },
-                  { key:"medium", label:"★ Good match" },
-                  { key:"both",   label:"★ Strong + Good" },
+                  { key:null,     label:"All new",       color:"#888" },
+                  { key:"high",   label:"★ Strong match", color:"#1DB954" },
+                  { key:"medium", label:"★ Good match",   color:"#d9c75a" },
+                  { key:"low",    label:"★ Wider stretch",color:"#e08a4f" },
                 ].map(f => (
                   <button key={String(f.key)} onClick={() => setRelFilter(f.key)}
                     style={{
                       padding:"4px 12px", borderRadius:500, fontSize:11, fontWeight:600, cursor:"pointer",
-                      background: relFilter === f.key ? "#1DB954" : "transparent",
-                      color:      relFilter === f.key ? "#000"    : "#888",
-                      border:     relFilter === f.key ? "none"    : "1px solid #333",
+                      background: relFilter === f.key ? f.color   : "transparent",
+                      color:      relFilter === f.key ? (f.key ? "#000" : "#fff") : f.color,
+                      border:     `1px solid ${relFilter === f.key ? f.color : "#333"}`,
                     }}>
                     {f.label}
                   </button>

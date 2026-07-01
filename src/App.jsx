@@ -494,9 +494,13 @@ export default function App() {
                             {track.artist.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase()}
                           </div>
                           <div style={{ minWidth:0 }}>
-                            <div style={{ fontSize:14, color:isPlaying?"#1DB954":"#fff", fontWeight:500 }}>
+                            <div style={{ fontSize:14, color:isPlaying?"#1DB954":"#fff", fontWeight:500, display:"flex", alignItems:"center", gap:6 }}>
                               {track.title}
-                              {wasSkipped && <span style={{ marginLeft:8, fontSize:10, color:"#888", fontWeight:400 }}>skipped</span>}
+                              {relStyle && (
+                                <span title={`${relStyle.label} — Relevance Anchor`}
+                                  style={{ color:relStyle.color, fontSize:13, flexShrink:0 }}>★</span>
+                              )}
+                              {wasSkipped && <span style={{ fontSize:10, color:"#888", fontWeight:400 }}>skipped</span>}
                             </div>
                             <div style={{ fontSize:12, color:"#b3b3b3" }}>{track.artist}</div>
                             {isNew && (
@@ -548,22 +552,11 @@ export default function App() {
                         )}
                       </div>
 
-                      {/* Tag + relevance star — right side */}
-                      <div style={{ textAlign:"right", paddingTop:8 }}>
-                        {isNew ? (
-                          <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:3 }}>
-                            <span style={{ border:"1px solid #1DB954", color:"#1DB954", borderRadius:500, padding:"2px 10px", fontSize:11, fontWeight:600 }}>New</span>
-                            {relStyle && (
-                              <span
-                                title={`${relStyle.label} — Relevance Anchor`}
-                                style={{ color:relStyle.color, fontSize:13, lineHeight:1 }}>
-                                ★
-                              </span>
-                            )}
-                          </div>
-                        ) : (
-                          <span style={{ color:"#b3b3b3", fontSize:12 }}>In rotation</span>
-                        )}
+                      {/* Tag column — New / In rotation only */}
+                      <div style={{ textAlign:"right", paddingTop:10 }}>
+                        {isNew
+                          ? <span style={{ border:"1px solid #1DB954", color:"#1DB954", borderRadius:500, padding:"2px 10px", fontSize:11, fontWeight:600 }}>New</span>
+                          : <span style={{ color:"#b3b3b3", fontSize:12 }}>In rotation</span>}
                       </div>
 
                       {/* Year */}

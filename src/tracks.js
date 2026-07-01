@@ -10,6 +10,20 @@ export const VIBES = [
   { id: "hyperpop",  label: "Hyperpop & underground", seed: "glitchy, maximal, playful" },
   { id: "jazz",      label: "Jazz & sample-based",  seed: "improvised, soulful, organic" },
   { id: "shoegaze",  label: "Shoegaze & dream-pop", seed: "hazy, reverb-soaked, melodic" },
+
+  // WIDER STRETCH additions — guaranteed Wider stretch tier at high dial settings
+  { id:"i_w1", title:"No News From Home", artist:"Ariel Pink", vibe:"indie", familiarity:"new", energy:5, mood:"frantic", year:2014 },
+  { id:"i_w2", title:"Ribs", artist:"Lorde", vibe:"indie", familiarity:"new", energy:5, mood:"anxious", year:2013 },
+  { id:"a_w1", title:"Zone", artist:"Grouper", vibe:"ambient", familiarity:"new", energy:4, mood:"haunted", year:2008 },
+  { id:"a_w2", title:"Drift", artist:"Stars of the Lid", vibe:"ambient", familiarity:"new", energy:4, mood:"orchestral", year:2007 },
+  { id:"t_w1", title:"Emptiness", artist:"Demdike Stare", vibe:"techno", familiarity:"new", energy:1, mood:"desolate", year:2010 },
+  { id:"t_w2", title:"Midnight Request Line", artist:"Skream", vibe:"techno", familiarity:"new", energy:1, mood:"dubstep", year:2005 },
+  { id:"h_w1", title:"Show Me Love", artist:"Robyn", vibe:"hyperpop", familiarity:"new", energy:2, mood:"bittersweet", year:2010 },
+  { id:"h_w2", title:"Complicated", artist:"Avril Lavigne", vibe:"hyperpop", familiarity:"new", energy:2, mood:"angsty", year:2002 },
+  { id:"j_w1", title:"A Love Supreme Pt. 1", artist:"John Coltrane", vibe:"jazz", familiarity:"new", energy:5, mood:"devotional", year:1964 },
+  { id:"j_w2", title:"Birdland", artist:"Weather Report", vibe:"jazz", familiarity:"new", energy:5, mood:"explosive", year:1977 },
+  { id:"s_w1", title:"Mute", artist:"Jesu", vibe:"shoegaze", familiarity:"new", energy:1, mood:"drone", year:2006 },
+  { id:"s_w2", title:"The Crow", artist:"Low", vibe:"shoegaze", familiarity:"new", energy:1, mood:"sparse", year:1996 },
 ];
 
 export const TRACKS = [
@@ -19,6 +33,8 @@ export const TRACKS = [
   { id:"i3", title:"The Less I Know The Better", artist:"Tame Impala", vibe:"indie", familiarity:"familiar", energy:3, mood:"groovy", year:2015 },
   { id:"i4", title:"Space Song", artist:"Beach House", vibe:"indie", familiarity:"familiar", energy:2, mood:"dreamy", year:2015 },
   { id:"i5", title:"Punisher", artist:"Phoebe Bridgers", vibe:"indie", familiarity:"familiar", energy:2, mood:"melancholy", year:2020 },
+  { id:"i5b", title:"Motion Sickness", artist:"Phoebe Bridgers", vibe:"indie", familiarity:"familiar", energy:3, mood:"yearning", year:2017 },
+  { id:"i5c", title:"Nobody", artist:"Mitski", vibe:"indie", familiarity:"familiar", energy:3, mood:"longing", year:2018 },
   { id:"i6", title:"Sunflower Bean — Crisis Fest", artist:"Sunflower Bean", vibe:"indie", familiarity:"new", energy:4, mood:"restless", year:2018 },
   { id:"i7", title:"Quarter to Three", artist:"Hovvdy", vibe:"indie", familiarity:"new", energy:2, mood:"warm", year:2021 },
   { id:"i8", title:"Scott Street (demo)", artist:"Indigo De Souza", vibe:"indie", familiarity:"new", energy:3, mood:"raw", year:2021 },
@@ -85,4 +101,18 @@ export const TRACKS = [
   { id:"s8", title:"Heaven", artist:"DIIV", vibe:"shoegaze", familiarity:"new", energy:3, mood:"glistening", year:2019 },
   { id:"s9", title:"Glow", artist:"Nothing", vibe:"shoegaze", familiarity:"new", energy:4, mood:"bittersweet", year:2016 },
   { id:"s10", title:"Fleeting Youth", artist:"Flyying Colours", vibe:"shoegaze", familiarity:"new", energy:4, mood:"rushing", year:2015 },
+
+  // WIDER STRETCH additions — guaranteed Wider stretch tier at high dial settings
+  { id:"i_w1", title:"No News From Home", artist:"Ariel Pink", vibe:"indie", familiarity:"new", energy:5, mood:"frantic", year:2014 },
+  { id:"i_w2", title:"Ribs", artist:"Lorde", vibe:"indie", familiarity:"new", energy:5, mood:"anxious", year:2013 },
+  { id:"a_w1", title:"Zone", artist:"Grouper", vibe:"ambient", familiarity:"new", energy:4, mood:"haunted", year:2008 },
+  { id:"a_w2", title:"Drift", artist:"Stars of the Lid", vibe:"ambient", familiarity:"new", energy:4, mood:"orchestral", year:2007 },
+  { id:"t_w1", title:"Emptiness", artist:"Demdike Stare", vibe:"techno", familiarity:"new", energy:1, mood:"desolate", year:2010 },
+  { id:"t_w2", title:"Midnight Request Line", artist:"Skream", vibe:"techno", familiarity:"new", energy:1, mood:"dubstep", year:2005 },
+  { id:"h_w1", title:"Show Me Love", artist:"Robyn", vibe:"hyperpop", familiarity:"new", energy:2, mood:"bittersweet", year:2010 },
+  { id:"h_w2", title:"Complicated", artist:"Avril Lavigne", vibe:"hyperpop", familiarity:"new", energy:2, mood:"angsty", year:2002 },
+  { id:"j_w1", title:"A Love Supreme Pt. 1", artist:"John Coltrane", vibe:"jazz", familiarity:"new", energy:5, mood:"devotional", year:1964 },
+  { id:"j_w2", title:"Birdland", artist:"Weather Report", vibe:"jazz", familiarity:"new", energy:5, mood:"explosive", year:1977 },
+  { id:"s_w1", title:"Mute", artist:"Jesu", vibe:"shoegaze", familiarity:"new", energy:1, mood:"drone", year:2006 },
+  { id:"s_w2", title:"The Crow", artist:"Low", vibe:"shoegaze", familiarity:"new", energy:1, mood:"sparse", year:1996 },
 ];

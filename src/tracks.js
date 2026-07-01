@@ -11,22 +11,7 @@ export const VIBES = [
   { id: "jazz",      label: "Jazz & sample-based",  seed: "improvised, soulful, organic" },
   { id: "shoegaze",  label: "Shoegaze & dream-pop", seed: "hazy, reverb-soaked, melodic" },
 
-  // WIDER STRETCH additions — guaranteed Wider stretch tier at high dial settings
-  { id:"i_w1", title:"No News From Home", artist:"Ariel Pink", vibe:"indie", familiarity:"new", energy:5, mood:"frantic", year:2014 },
-  { id:"i_w2", title:"Ribs", artist:"Lorde", vibe:"indie", familiarity:"new", energy:5, mood:"anxious", year:2013 },
-  { id:"a_w1", title:"Zone", artist:"Grouper", vibe:"ambient", familiarity:"new", energy:4, mood:"haunted", year:2008 },
-  { id:"a_w2", title:"Drift", artist:"Stars of the Lid", vibe:"ambient", familiarity:"new", energy:4, mood:"orchestral", year:2007 },
-  { id:"t_w1", title:"Emptiness", artist:"Demdike Stare", vibe:"techno", familiarity:"new", energy:1, mood:"desolate", year:2010 },
-  { id:"t_w2", title:"Midnight Request Line", artist:"Skream", vibe:"techno", familiarity:"new", energy:1, mood:"dubstep", year:2005 },
-  { id:"h_w1", title:"Show Me Love", artist:"Robyn", vibe:"hyperpop", familiarity:"new", energy:2, mood:"bittersweet", year:2010 },
-  { id:"h_w2", title:"Complicated", artist:"Avril Lavigne", vibe:"hyperpop", familiarity:"new", energy:2, mood:"angsty", year:2002 },
-  { id:"j_w1", title:"A Love Supreme Pt. 1", artist:"John Coltrane", vibe:"jazz", familiarity:"new", energy:5, mood:"devotional", year:1964 },
-  { id:"j_w2", title:"Birdland", artist:"Weather Report", vibe:"jazz", familiarity:"new", energy:5, mood:"explosive", year:1977 },
-  { id:"s_w1", title:"Mute", artist:"Jesu", vibe:"shoegaze", familiarity:"new", energy:1, mood:"drone", year:2006 },
-  { id:"s_w2", title:"The Crow", artist:"Low", vibe:"shoegaze", familiarity:"new", energy:1, mood:"sparse", year:1996 },
-];
 
-export const TRACKS = [
   // INDIE
   { id:"i1", title:"Apocalypse", artist:"Cigarettes After Sex", vibe:"indie", familiarity:"familiar", energy:2, mood:"melancholy", year:2017 },
   { id:"i2", title:"Two Slow Dancers", artist:"Mitski", vibe:"indie", familiarity:"familiar", energy:2, mood:"melancholy", year:2018 },
